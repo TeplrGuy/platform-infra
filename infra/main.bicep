@@ -17,7 +17,7 @@ var appServicePlanName = '${prefix}-${environmentName}-asp'
 var logAnalyticsName = '${prefix}-${environmentName}-law'
 var appInsightsName = '${prefix}-${environmentName}-appi'
 var keyVaultName = toLower('${take(prefix, 12)}${environmentName}kv')
-var serviceBusNamespaceName = toLower('${take(prefix, 20)}-${environmentName}-sb')
+var serviceBusNamespaceName = toLower('${take(prefix, 18)}${environmentName}bus')
 
 resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: rgName

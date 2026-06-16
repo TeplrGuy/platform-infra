@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "14337001038196897967"
+      "templateHash": "7448497476018807439"
     }
   },
   "parameters": {
@@ -42,7 +42,7 @@
     "logAnalyticsName": "[format('{0}-{1}-law', parameters('prefix'), parameters('environmentName'))]",
     "appInsightsName": "[format('{0}-{1}-appi', parameters('prefix'), parameters('environmentName'))]",
     "keyVaultName": "[toLower(format('{0}{1}kv', take(parameters('prefix'), 12), parameters('environmentName')))]",
-    "serviceBusNamespaceName": "[toLower(format('{0}-{1}-sb', take(parameters('prefix'), 20), parameters('environmentName')))]"
+    "serviceBusNamespaceName": "[toLower(format('{0}{1}bus', take(parameters('prefix'), 18), parameters('environmentName')))]"
   },
   "resources": [
     {
