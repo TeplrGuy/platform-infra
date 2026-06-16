@@ -9,6 +9,9 @@ Infrastructure baseline for the SDLC demo platform in **West Europe**.
 - `infra/main.test.bicepparam`: Test environment parameters
 - `infra/main.prod.bicepparam`: Prod environment parameters
 - `.github/workflows/infra-ci.yml`: Bicep validation workflow
+- `.github/workflows/deploy-dev.yml`: Dev infrastructure deployment
+- `.github/workflows/promote-test.yml`: Test promotion deployment
+- `.github/workflows/promote-prod.yml`: Prod promotion deployment
 
 ## Resources provisioned
 
@@ -33,4 +36,13 @@ az deployment sub create \
   --parameters infra/main.dev.bicepparam
 ```
 
+## GitHub OIDC variables required
+
+Set these repository variables in `platform-infra`:
+
+- `AZURE_CLIENT_ID`
+- `AZURE_TENANT_ID` (`d11cdc76-c6f2-4368-a98f-498e78a7e011`)
+- `AZURE_SUBSCRIPTION_ID` (`8fcc5e8e-6540-4288-89e7-849e94290205`)
+
+Then configure GitHub Environments `dev`, `test`, and `prod` with approval rules.
 
