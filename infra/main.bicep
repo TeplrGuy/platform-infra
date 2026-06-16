@@ -9,15 +9,13 @@ param environmentName string
 @description('Resource name prefix, lowercase, no spaces')
 param prefix string
 
-@description('App Service Plan SKU name')
-param appServicePlanSku string = 'B1'
-
 var rgName = '${prefix}-${environmentName}-rg'
-var appServicePlanName = '${prefix}-${environmentName}-asp'
 var logAnalyticsName = '${prefix}-${environmentName}-law'
 var appInsightsName = '${prefix}-${environmentName}-appi'
 var keyVaultName = toLower('${take(prefix, 12)}${environmentName}kv')
 var serviceBusNamespaceName = toLower('${take(prefix, 18)}${environmentName}bus')
+var containerAppsEnvironmentName = '${prefix}-${environmentName}-cae'
+var containerRegistryName = toLower(replace('${take(prefix, 10)}${environmentName}acr', '-', ''))
 
 resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: rgName
@@ -31,14 +29,15 @@ module platform 'platform-resources.bicep' = {
     location: location
     prefix: prefix
     environmentName: environmentName
-    appServicePlanName: appServicePlanName
-    appServicePlanSku: appServicePlanSku
     logAnalyticsName: logAnalyticsName
     appInsightsName: appInsightsName
     keyVaultName: keyVaultName
     serviceBusNamespaceName: serviceBusNamespaceName
+    containerAppsEnvironmentName: containerAppsEnvironmentName
+    containerRegistryName: containerRegistryName
   }
 }
 
 output resourceGroupName string = rgName
-output appServicePlanId string = platform.outputs.appServicePlanId
+output containerAppsEnvironmentId string = platform.outputs.containerAppsEnvironmentId
+output containerRegistryLoginServer string = platform.outputs.containerRegistryLoginServer

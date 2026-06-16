@@ -7,12 +7,12 @@ param prefix string
 @description('Environment name')
 param environmentName string
 
-param appServicePlanName string
-param appServicePlanSku string
 param logAnalyticsName string
 param appInsightsName string
 param keyVaultName string
 param serviceBusNamespaceName string
+param containerAppsEnvironmentName string
+param containerRegistryName string
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: logAnalyticsName
@@ -66,77 +66,167 @@ resource serviceBus 'Microsoft.ServiceBus/namespaces@2023-01-01-preview' = {
   }
 }
 
-resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
-  name: appServicePlanName
+resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
+  name: containerRegistryName
   location: location
   sku: {
-    name: appServicePlanSku
-    tier: contains(['F1', 'D1', 'B1', 'B2', 'B3'], appServicePlanSku) ? 'Basic' : 'PremiumV3'
-    capacity: 1
+    name: 'Basic'
   }
-  kind: 'linux'
   properties: {
-    reserved: true
+    adminUserEnabled: false
   }
 }
 
-var appNames = [
-  '${prefix}-${environmentName}-api-gateway'
-  '${prefix}-${environmentName}-orders-service'
-  '${prefix}-${environmentName}-inventory-service'
-  '${prefix}-${environmentName}-notifications-service'
-]
-
-resource webApps 'Microsoft.Web/sites@2023-12-01' = [for appName in appNames: {
-  name: appName
+resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
+  name: containerAppsEnvironmentName
   location: location
-  kind: 'app,linux'
-  identity: {
-    type: 'SystemAssigned'
-  }
   properties: {
-    serverFarmId: appServicePlan.id
-    httpsOnly: true
-    siteConfig: {
-      linuxFxVersion: 'NODE|20-lts'
-      alwaysOn: true
-      minTlsVersion: '1.2'
-      ftpsState: 'Disabled'
-      appSettings: [
-        {
-          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-          value: appInsights.properties.ConnectionString
-        }
-        {
-          name: 'SERVICEBUS_NAMESPACE'
-          value: serviceBus.name
-        }
-        {
-          name: 'KEYVAULT_URI'
-          value: keyVault.properties.vaultUri
-        }
-        {
-          name: 'ENVIRONMENT_NAME'
-          value: environmentName
-        }
-      ]
+    appLogsConfiguration: {
+      destination: 'log-analytics'
+      logAnalyticsConfiguration: {
+        customerId: logAnalytics.properties.customerId
+        sharedKey: logAnalytics.listKeys().primarySharedKey
+      }
     }
   }
-}]
+}
 
+var services = [
+  {
+    name: 'api-gateway'
+    external: true
+    minReplicas: 1
+  }
+  {
+    name: 'orders-service'
+    external: false
+    minReplicas: 1
+  }
+  {
+    name: 'inventory-service'
+    external: false
+    minReplicas: 0
+  }
+  {
+    name: 'notifications-service'
+    external: false
+    minReplicas: 0
+  }
+]
+
+var containerAppNames = [for service in services: '${prefix}-${environmentName}-${service.name}']
 var keyVaultSecretsUserRoleDefinitionId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '4633458b-17de-408a-b874-0445c86b69e6'
 )
+var acrPullRoleDefinitionId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+)
 
-resource keyVaultSecretAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (appName, i) in appNames: {
+resource containerApps 'Microsoft.App/containerApps@2024-03-01' = [for (service, i) in services: {
+  name: containerAppNames[i]
+  location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  properties: {
+    environmentId: containerAppsEnvironment.id
+    configuration: {
+      ingress: {
+        external: service.external
+        targetPort: 3000
+        transport: 'auto'
+      }
+      activeRevisionsMode: 'Single'
+    }
+    template: {
+      containers: [
+        {
+          name: service.name
+          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+          env: [
+            {
+              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+              value: appInsights.properties.ConnectionString
+            }
+            {
+              name: 'SERVICEBUS_NAMESPACE'
+              value: serviceBus.name
+            }
+            {
+              name: 'KEYVAULT_URI'
+              value: keyVault.properties.vaultUri
+            }
+            {
+              name: 'ENVIRONMENT_NAME'
+              value: environmentName
+            }
+          ]
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+          probes: [
+            {
+              type: 'Liveness'
+              httpGet: {
+                path: '/health'
+                port: 3000
+              }
+              initialDelaySeconds: 20
+              periodSeconds: 10
+            }
+            {
+              type: 'Readiness'
+              httpGet: {
+                path: '/health'
+                port: 3000
+              }
+              initialDelaySeconds: 15
+              periodSeconds: 10
+            }
+            {
+              type: 'Startup'
+              httpGet: {
+                path: '/health'
+                port: 3000
+              }
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              failureThreshold: 18
+            }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: service.minReplicas
+        maxReplicas: 3
+      }
+    }
+  }
+}]
+
+resource keyVaultSecretAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (appName, i) in containerAppNames: {
   scope: keyVault
   name: guid(keyVault.id, appName, 'keyvault-secrets-user')
   properties: {
-    principalId: webApps[i].identity.principalId
+    principalId: containerApps[i].identity.principalId
     roleDefinitionId: keyVaultSecretsUserRoleDefinitionId
     principalType: 'ServicePrincipal'
   }
 }]
 
-output appServicePlanId string = appServicePlan.id
+resource acrPullRoleAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (appName, i) in containerAppNames: {
+  scope: containerRegistry
+  name: guid(containerRegistry.id, appName, 'acrpull')
+  properties: {
+    principalId: containerApps[i].identity.principalId
+    roleDefinitionId: acrPullRoleDefinitionId
+    principalType: 'ServicePrincipal'
+  }
+}]
+
+output containerAppsEnvironmentId string = containerAppsEnvironment.id
+output containerRegistryLoginServer string = containerRegistry.properties.loginServer
+output containerAppNames array = containerAppNames

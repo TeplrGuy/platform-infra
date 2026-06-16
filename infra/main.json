@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "7448497476018807439"
+      "templateHash": "7102294506786553776"
     }
   },
   "parameters": {
@@ -27,22 +27,16 @@
       "metadata": {
         "description": "Resource name prefix, lowercase, no spaces"
       }
-    },
-    "appServicePlanSku": {
-      "type": "string",
-      "defaultValue": "B1",
-      "metadata": {
-        "description": "App Service Plan SKU name"
-      }
     }
   },
   "variables": {
     "rgName": "[format('{0}-{1}-rg', parameters('prefix'), parameters('environmentName'))]",
-    "appServicePlanName": "[format('{0}-{1}-asp', parameters('prefix'), parameters('environmentName'))]",
     "logAnalyticsName": "[format('{0}-{1}-law', parameters('prefix'), parameters('environmentName'))]",
     "appInsightsName": "[format('{0}-{1}-appi', parameters('prefix'), parameters('environmentName'))]",
     "keyVaultName": "[toLower(format('{0}{1}kv', take(parameters('prefix'), 12), parameters('environmentName')))]",
-    "serviceBusNamespaceName": "[toLower(format('{0}{1}bus', take(parameters('prefix'), 18), parameters('environmentName')))]"
+    "serviceBusNamespaceName": "[toLower(format('{0}{1}bus', take(parameters('prefix'), 18), parameters('environmentName')))]",
+    "containerAppsEnvironmentName": "[format('{0}-{1}-cae', parameters('prefix'), parameters('environmentName'))]",
+    "containerRegistryName": "[toLower(replace(format('{0}{1}acr', take(parameters('prefix'), 10), parameters('environmentName')), '-', ''))]"
   },
   "resources": [
     {
@@ -71,12 +65,6 @@
           "environmentName": {
             "value": "[parameters('environmentName')]"
           },
-          "appServicePlanName": {
-            "value": "[variables('appServicePlanName')]"
-          },
-          "appServicePlanSku": {
-            "value": "[parameters('appServicePlanSku')]"
-          },
           "logAnalyticsName": {
             "value": "[variables('logAnalyticsName')]"
           },
@@ -88,6 +76,12 @@
           },
           "serviceBusNamespaceName": {
             "value": "[variables('serviceBusNamespaceName')]"
+          },
+          "containerAppsEnvironmentName": {
+            "value": "[variables('containerAppsEnvironmentName')]"
+          },
+          "containerRegistryName": {
+            "value": "[variables('containerRegistryName')]"
           }
         },
         "template": {
@@ -97,7 +91,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.41.2.15936",
-              "templateHash": "13386234183367186282"
+              "templateHash": "5893520642416607036"
             }
           },
           "parameters": {
@@ -119,12 +113,6 @@
                 "description": "Environment name"
               }
             },
-            "appServicePlanName": {
-              "type": "string"
-            },
-            "appServicePlanSku": {
-              "type": "string"
-            },
             "logAnalyticsName": {
               "type": "string"
             },
@@ -136,16 +124,46 @@
             },
             "serviceBusNamespaceName": {
               "type": "string"
+            },
+            "containerAppsEnvironmentName": {
+              "type": "string"
+            },
+            "containerRegistryName": {
+              "type": "string"
             }
           },
           "variables": {
-            "appNames": [
-              "[format('{0}-{1}-api-gateway', parameters('prefix'), parameters('environmentName'))]",
-              "[format('{0}-{1}-orders-service', parameters('prefix'), parameters('environmentName'))]",
-              "[format('{0}-{1}-inventory-service', parameters('prefix'), parameters('environmentName'))]",
-              "[format('{0}-{1}-notifications-service', parameters('prefix'), parameters('environmentName'))]"
+            "copy": [
+              {
+                "name": "containerAppNames",
+                "count": "[length(variables('services'))]",
+                "input": "[format('{0}-{1}-{2}', parameters('prefix'), parameters('environmentName'), variables('services')[copyIndex('containerAppNames')].name)]"
+              }
             ],
-            "keyVaultSecretsUserRoleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')]"
+            "services": [
+              {
+                "name": "api-gateway",
+                "external": true,
+                "minReplicas": 1
+              },
+              {
+                "name": "orders-service",
+                "external": false,
+                "minReplicas": 1
+              },
+              {
+                "name": "inventory-service",
+                "external": false,
+                "minReplicas": 0
+              },
+              {
+                "name": "notifications-service",
+                "external": false,
+                "minReplicas": 0
+              }
+            ],
+            "keyVaultSecretsUserRoleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')]",
+            "acrPullRoleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')]"
           },
           "resources": [
             {
@@ -208,64 +226,125 @@
               }
             },
             {
-              "type": "Microsoft.Web/serverfarms",
-              "apiVersion": "2023-12-01",
-              "name": "[parameters('appServicePlanName')]",
+              "type": "Microsoft.ContainerRegistry/registries",
+              "apiVersion": "2023-07-01",
+              "name": "[parameters('containerRegistryName')]",
               "location": "[parameters('location')]",
               "sku": {
-                "name": "[parameters('appServicePlanSku')]",
-                "tier": "[if(contains(createArray('F1', 'D1', 'B1', 'B2', 'B3'), parameters('appServicePlanSku')), 'Basic', 'PremiumV3')]",
-                "capacity": 1
+                "name": "Basic"
               },
-              "kind": "linux",
               "properties": {
-                "reserved": true
+                "adminUserEnabled": false
               }
             },
             {
-              "copy": {
-                "name": "webApps",
-                "count": "[length(variables('appNames'))]"
-              },
-              "type": "Microsoft.Web/sites",
-              "apiVersion": "2023-12-01",
-              "name": "[variables('appNames')[copyIndex()]]",
+              "type": "Microsoft.App/managedEnvironments",
+              "apiVersion": "2024-03-01",
+              "name": "[parameters('containerAppsEnvironmentName')]",
               "location": "[parameters('location')]",
-              "kind": "app,linux",
+              "properties": {
+                "appLogsConfiguration": {
+                  "destination": "log-analytics",
+                  "logAnalyticsConfiguration": {
+                    "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName')), '2023-09-01').customerId]",
+                    "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName')), '2023-09-01').primarySharedKey]"
+                  }
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsName'))]"
+              ]
+            },
+            {
+              "copy": {
+                "name": "containerApps",
+                "count": "[length(variables('services'))]"
+              },
+              "type": "Microsoft.App/containerApps",
+              "apiVersion": "2024-03-01",
+              "name": "[variables('containerAppNames')[copyIndex()]]",
+              "location": "[parameters('location')]",
               "identity": {
                 "type": "SystemAssigned"
               },
               "properties": {
-                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
-                "httpsOnly": true,
-                "siteConfig": {
-                  "linuxFxVersion": "NODE|20-lts",
-                  "alwaysOn": true,
-                  "minTlsVersion": "1.2",
-                  "ftpsState": "Disabled",
-                  "appSettings": [
+                "environmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('containerAppsEnvironmentName'))]",
+                "configuration": {
+                  "ingress": {
+                    "external": "[variables('services')[copyIndex()].external]",
+                    "targetPort": 3000,
+                    "transport": "auto"
+                  },
+                  "activeRevisionsMode": "Single"
+                },
+                "template": {
+                  "containers": [
                     {
-                      "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
-                      "value": "[reference(resourceId('Microsoft.Insights/components', parameters('appInsightsName')), '2020-02-02').ConnectionString]"
-                    },
-                    {
-                      "name": "SERVICEBUS_NAMESPACE",
-                      "value": "[parameters('serviceBusNamespaceName')]"
-                    },
-                    {
-                      "name": "KEYVAULT_URI",
-                      "value": "[reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri]"
-                    },
-                    {
-                      "name": "ENVIRONMENT_NAME",
-                      "value": "[parameters('environmentName')]"
+                      "name": "[variables('services')[copyIndex()].name]",
+                      "image": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+                      "env": [
+                        {
+                          "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+                          "value": "[reference(resourceId('Microsoft.Insights/components', parameters('appInsightsName')), '2020-02-02').ConnectionString]"
+                        },
+                        {
+                          "name": "SERVICEBUS_NAMESPACE",
+                          "value": "[parameters('serviceBusNamespaceName')]"
+                        },
+                        {
+                          "name": "KEYVAULT_URI",
+                          "value": "[reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri]"
+                        },
+                        {
+                          "name": "ENVIRONMENT_NAME",
+                          "value": "[parameters('environmentName')]"
+                        }
+                      ],
+                      "resources": {
+                        "cpu": "[json('0.5')]",
+                        "memory": "1Gi"
+                      },
+                      "probes": [
+                        {
+                          "type": "Liveness",
+                          "httpGet": {
+                            "path": "/health",
+                            "port": 3000
+                          },
+                          "initialDelaySeconds": 20,
+                          "periodSeconds": 10
+                        },
+                        {
+                          "type": "Readiness",
+                          "httpGet": {
+                            "path": "/health",
+                            "port": 3000
+                          },
+                          "initialDelaySeconds": 15,
+                          "periodSeconds": 10
+                        },
+                        {
+                          "type": "Startup",
+                          "httpGet": {
+                            "path": "/health",
+                            "port": 3000
+                          },
+                          "initialDelaySeconds": 5,
+                          "periodSeconds": 10,
+                          "failureThreshold": 18
+                        }
+                      ]
                     }
-                  ]
+                  ],
+                  "scale": {
+                    "minReplicas": "[variables('services')[copyIndex()].minReplicas]",
+                    "maxReplicas": 3
+                  }
                 }
               },
               "dependsOn": [
                 "[resourceId('Microsoft.Insights/components', parameters('appInsightsName'))]",
-                "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
+                "[resourceId('Microsoft.App/managedEnvironments', parameters('containerAppsEnvironmentName'))]",
                 "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
                 "[resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName'))]"
               ]
@@ -273,27 +352,54 @@
             {
               "copy": {
                 "name": "keyVaultSecretAccess",
-                "count": "[length(variables('appNames'))]"
+                "count": "[length(variables('containerAppNames'))]"
               },
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
               "scope": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
-              "name": "[guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), variables('appNames')[copyIndex()], 'keyvault-secrets-user')]",
+              "name": "[guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), variables('containerAppNames')[copyIndex()], 'keyvault-secrets-user')]",
               "properties": {
-                "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('appNames')[copyIndex()]), '2023-12-01', 'full').identity.principalId]",
+                "principalId": "[reference(resourceId('Microsoft.App/containerApps', variables('containerAppNames')[copyIndex()]), '2024-03-01', 'full').identity.principalId]",
                 "roleDefinitionId": "[variables('keyVaultSecretsUserRoleDefinitionId')]",
                 "principalType": "ServicePrincipal"
               },
               "dependsOn": [
-                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
-                "[resourceId('Microsoft.Web/sites', variables('appNames')[copyIndex()])]"
+                "[resourceId('Microsoft.App/containerApps', variables('containerAppNames')[copyIndex()])]",
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+              ]
+            },
+            {
+              "copy": {
+                "name": "acrPullRoleAssignments",
+                "count": "[length(variables('containerAppNames'))]"
+              },
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('containerRegistryName'))]",
+              "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', parameters('containerRegistryName')), variables('containerAppNames')[copyIndex()], 'acrpull')]",
+              "properties": {
+                "principalId": "[reference(resourceId('Microsoft.App/containerApps', variables('containerAppNames')[copyIndex()]), '2024-03-01', 'full').identity.principalId]",
+                "roleDefinitionId": "[variables('acrPullRoleDefinitionId')]",
+                "principalType": "ServicePrincipal"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.App/containerApps', variables('containerAppNames')[copyIndex()])]",
+                "[resourceId('Microsoft.ContainerRegistry/registries', parameters('containerRegistryName'))]"
               ]
             }
           ],
           "outputs": {
-            "appServicePlanId": {
+            "containerAppsEnvironmentId": {
               "type": "string",
-              "value": "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]"
+              "value": "[resourceId('Microsoft.App/managedEnvironments', parameters('containerAppsEnvironmentName'))]"
+            },
+            "containerRegistryLoginServer": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('containerRegistryName')), '2023-07-01').loginServer]"
+            },
+            "containerAppNames": {
+              "type": "array",
+              "value": "[variables('containerAppNames')]"
             }
           }
         }
@@ -308,9 +414,13 @@
       "type": "string",
       "value": "[variables('rgName')]"
     },
-    "appServicePlanId": {
+    "containerAppsEnvironmentId": {
       "type": "string",
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'platform-resources'), '2025-04-01').outputs.appServicePlanId.value]"
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'platform-resources'), '2025-04-01').outputs.containerAppsEnvironmentId.value]"
+    },
+    "containerRegistryLoginServer": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('rgName')), 'Microsoft.Resources/deployments', 'platform-resources'), '2025-04-01').outputs.containerRegistryLoginServer.value]"
     }
   }
 }
