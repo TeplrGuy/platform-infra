@@ -1,0 +1,19 @@
+name: infra-ci
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  validate-bicep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Azure CLI
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az bicep version
+            az bicep build --file infra/main.bicep
