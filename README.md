@@ -1,6 +1,6 @@
-# agentic-platform-infra
+# platform-infra
 
-Infrastructure baseline for the Agentic SDLC demo platform in **West Europe**.
+Infrastructure baseline for the SDLC demo platform in **West Europe**.
 
 ## What this repo contains
 
@@ -27,9 +27,10 @@ Infrastructure baseline for the Agentic SDLC demo platform in **West Europe**.
 
 ```bash
 az deployment sub create \
-  --name agentic-dev-bootstrap \
+  --name dev-bootstrap \
   --location westeurope \
   --template-file infra/main.bicep \
   --parameters infra/main.dev.bicepparam
 ```
+
 
