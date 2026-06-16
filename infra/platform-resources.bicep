@@ -94,27 +94,31 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
 var services = [
   {
     name: 'api-gateway'
+    appSuffix: 'apigw'
     external: true
     minReplicas: 1
   }
   {
     name: 'orders-service'
+    appSuffix: 'orders'
     external: false
     minReplicas: 1
   }
   {
     name: 'inventory-service'
+    appSuffix: 'inventory'
     external: false
     minReplicas: 0
   }
   {
     name: 'notifications-service'
+    appSuffix: 'notify'
     external: false
     minReplicas: 0
   }
 ]
 
-var containerAppNames = [for service in services: '${prefix}-${environmentName}-${service.name}']
+var containerAppNames = [for service in services: '${prefix}-${environmentName}-${service.appSuffix}']
 var keyVaultSecretsUserRoleDefinitionId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '4633458b-17de-408a-b874-0445c86b69e6'

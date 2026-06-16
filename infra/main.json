@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "7102294506786553776"
+      "templateHash": "18410629834508671353"
     }
   },
   "parameters": {
@@ -91,7 +91,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.41.2.15936",
-              "templateHash": "5893520642416607036"
+              "templateHash": "5660967142776104994"
             }
           },
           "parameters": {
@@ -137,27 +137,31 @@
               {
                 "name": "containerAppNames",
                 "count": "[length(variables('services'))]",
-                "input": "[format('{0}-{1}-{2}', parameters('prefix'), parameters('environmentName'), variables('services')[copyIndex('containerAppNames')].name)]"
+                "input": "[format('{0}-{1}-{2}', parameters('prefix'), parameters('environmentName'), variables('services')[copyIndex('containerAppNames')].appSuffix)]"
               }
             ],
             "services": [
               {
                 "name": "api-gateway",
+                "appSuffix": "apigw",
                 "external": true,
                 "minReplicas": 1
               },
               {
                 "name": "orders-service",
+                "appSuffix": "orders",
                 "external": false,
                 "minReplicas": 1
               },
               {
                 "name": "inventory-service",
+                "appSuffix": "inventory",
                 "external": false,
                 "minReplicas": 0
               },
               {
                 "name": "notifications-service",
+                "appSuffix": "notify",
                 "external": false,
                 "minReplicas": 0
               }
