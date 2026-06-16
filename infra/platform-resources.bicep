@@ -124,4 +124,19 @@ resource webApps 'Microsoft.Web/sites@2023-12-01' = [for appName in appNames: {
   }
 }]
 
+var keyVaultSecretsUserRoleDefinitionId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '4633458b-17de-408a-b874-0445c86b69e6'
+)
+
+resource keyVaultSecretAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for (appName, i) in appNames: {
+  scope: keyVault
+  name: guid(keyVault.id, appName, 'keyvault-secrets-user')
+  properties: {
+    principalId: webApps[i].identity.principalId
+    roleDefinitionId: keyVaultSecretsUserRoleDefinitionId
+    principalType: 'ServicePrincipal'
+  }
+}]
+
 output appServicePlanId string = appServicePlan.id

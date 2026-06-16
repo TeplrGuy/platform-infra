@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "3901058611459545801"
+      "templateHash": "14337001038196897967"
     }
   },
   "parameters": {
@@ -97,7 +97,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.41.2.15936",
-              "templateHash": "7562277783493913796"
+              "templateHash": "13386234183367186282"
             }
           },
           "parameters": {
@@ -144,7 +144,8 @@
               "[format('{0}-{1}-orders-service', parameters('prefix'), parameters('environmentName'))]",
               "[format('{0}-{1}-inventory-service', parameters('prefix'), parameters('environmentName'))]",
               "[format('{0}-{1}-notifications-service', parameters('prefix'), parameters('environmentName'))]"
-            ]
+            ],
+            "keyVaultSecretsUserRoleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')]"
           },
           "resources": [
             {
@@ -267,6 +268,25 @@
                 "[resourceId('Microsoft.Web/serverfarms', parameters('appServicePlanName'))]",
                 "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
                 "[resourceId('Microsoft.ServiceBus/namespaces', parameters('serviceBusNamespaceName'))]"
+              ]
+            },
+            {
+              "copy": {
+                "name": "keyVaultSecretAccess",
+                "count": "[length(variables('appNames'))]"
+              },
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+              "name": "[guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), variables('appNames')[copyIndex()], 'keyvault-secrets-user')]",
+              "properties": {
+                "principalId": "[reference(resourceId('Microsoft.Web/sites', variables('appNames')[copyIndex()]), '2023-12-01', 'full').identity.principalId]",
+                "roleDefinitionId": "[variables('keyVaultSecretsUserRoleDefinitionId')]",
+                "principalType": "ServicePrincipal"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+                "[resourceId('Microsoft.Web/sites', variables('appNames')[copyIndex()])]"
               ]
             }
           ],
