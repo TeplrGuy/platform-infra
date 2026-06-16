@@ -1,6 +1,6 @@
 # platform-infra
 
-Infrastructure baseline for the SDLC demo platform in **West Europe**.
+Infrastructure baseline for the SDLC demo platform in **North Europe**.
 
 ## What this repo contains
 
@@ -13,16 +13,17 @@ Infrastructure baseline for the SDLC demo platform in **West Europe**.
 - `.github/workflows/deploy-dev.yml`: Dev infrastructure deployment
 - `.github/workflows/promote-test.yml`: Test promotion deployment
 - `.github/workflows/promote-prod.yml`: Prod promotion deployment
+- `.github/workflows/rollback.yml`: Environment rollback to a known good Git ref
 
 ## Resources provisioned
 
 - Azure Container Apps Environment
 - Azure Container Registry
 - Container Apps:
-  - `api-gateway` (external ingress)
-  - `orders-service` (internal ingress)
-  - `inventory-service` (internal ingress)
-  - `notifications-service` (internal ingress)
+  - `apigw` (external ingress)
+  - `orders` (internal ingress)
+  - `inventory` (internal ingress)
+  - `notify` (internal ingress)
 - Azure Key Vault
 - Azure Service Bus namespace
 - Log Analytics workspace
@@ -33,7 +34,7 @@ Infrastructure baseline for the SDLC demo platform in **West Europe**.
 ```bash
 az deployment sub create \
   --name dev-bootstrap \
-  --location westeurope \
+  --location northeurope \
   --template-file infra/main.bicep \
   --parameters infra/main.dev.bicepparam
 ```
@@ -47,3 +48,11 @@ Set these repository variables in `platform-infra`:
 - `AZURE_SUBSCRIPTION_ID` (`8fcc5e8e-6540-4288-89e7-849e94290205`)
 
 Then configure GitHub Environments `dev`, `test`, and `prod` with approval rules.
+
+## Customer walkthrough (day-in-the-life)
+
+1. Start with a GitHub issue and acceptance criteria in one of the service repos.
+2. Implement in a short-lived branch, open a PR, and link the issue.
+3. Use PR checklist + CODEOWNERS + `ci` + `security` workflows as merge gates.
+4. Run `deploy-dev` after merge, validate behavior, and promote with `promote-test` then `promote-prod`.
+5. If degradation appears, run `rollback` with the last known good commit SHA and document follow-up actions in a new issue.

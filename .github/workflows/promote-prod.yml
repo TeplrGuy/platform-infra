@@ -3,6 +3,10 @@ name: promote-prod
 on:
   workflow_dispatch:
 
+concurrency:
+  group: promote-prod-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   id-token: write
   contents: read
@@ -11,6 +15,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: prod
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: azure/login@v2
@@ -23,6 +28,6 @@ jobs:
           inlineScript: |
             az deployment sub create \
               --name platform-prod-${{ github.run_id }} \
-              --location westeurope \
+              --location northeurope \
               --template-file infra/main.bicep \
               --parameters infra/main.prod.bicepparam

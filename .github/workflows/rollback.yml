@@ -1,0 +1,48 @@
+name: rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment_name:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - test
+          - prod
+      ref_to_restore:
+        description: Git ref (commit SHA or tag) for last known good state
+        required: true
+        type: string
+
+concurrency:
+  group: rollback-${{ inputs.environment_name }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment_name }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref_to_restore }}
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az deployment sub create \
+              --name platform-${{ inputs.environment_name }}-rollback-${{ github.run_id }} \
+              --location northeurope \
+              --template-file infra/main.bicep \
+              --parameters infra/main.${{ inputs.environment_name }}.bicepparam

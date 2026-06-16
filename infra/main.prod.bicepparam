@@ -1,5 +1,5 @@
 using 'main.bicep'
 
-param location = 'westeurope'
+param location = 'northeurope'
 param environmentName = 'prod'
 param prefix = 'agtsdlc'
