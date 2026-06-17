@@ -20,6 +20,7 @@ Infrastructure baseline for the SDLC demo platform in **North Europe**.
 - Azure Container Apps Environment
 - Azure Container Registry
 - Container Apps:
+  - `portal` (external ingress)
   - `apigw` (external ingress)
   - `orders` (internal ingress)
   - `inventory` (internal ingress)
@@ -56,3 +57,4 @@ Then configure GitHub Environments `dev`, `test`, and `prod` with approval rules
 3. Use PR checklist + CODEOWNERS + `ci` + `security` workflows as merge gates.
 4. Run `deploy-dev` after merge, validate behavior, and promote with `promote-test` then `promote-prod`.
 5. If degradation appears, run `rollback` with the last known good commit SHA and document follow-up actions in a new issue.
+6. Use `portal-web` to demonstrate the visible customer flow and link the runtime behavior back to GitHub issues, PRs, and workflows.

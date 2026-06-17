@@ -116,6 +116,12 @@ var services = [
     external: false
     minReplicas: 0
   }
+  {
+    name: 'portal-web'
+    appSuffix: 'portal'
+    external: true
+    minReplicas: 1
+  }
 ]
 
 var containerAppNames = [for service in services: '${prefix}-${environmentName}-${service.appSuffix}']

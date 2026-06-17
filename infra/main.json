@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "18410629834508671353"
+      "templateHash": "5896032364798505549"
     }
   },
   "parameters": {
@@ -91,7 +91,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.41.2.15936",
-              "templateHash": "5660967142776104994"
+              "templateHash": "8815937719152971417"
             }
           },
           "parameters": {
@@ -164,6 +164,12 @@
                 "appSuffix": "notify",
                 "external": false,
                 "minReplicas": 0
+              },
+              {
+                "name": "portal-web",
+                "appSuffix": "portal",
+                "external": true,
+                "minReplicas": 1
               }
             ],
             "keyVaultSecretsUserRoleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')]",
