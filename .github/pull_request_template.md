@@ -1,16 +1,32 @@
-## Summary
+## Linked Work
 - Issue:
-- What changed:
+- Related PRs/issues:
 
-## Validation
-- [ ] Infra CI workflow passed
-- [ ] Security workflow passed
-- [ ] Cost and blast radius reviewed
+## Problem and Scope
+- Problem statement:
+- Root cause (if bug):
+- In scope:
+- Out of scope:
 
-## Risk and Rollout
+## Wave Plan (required for multi-step work)
+| Wave | Files/areas | Owner | Checkpoint evidence |
+| --- | --- | --- | --- |
+| 1 |  |  |  |
+| 2 |  |  |  |
+
+## Validation Evidence
+- [ ] Infra CI passed (link):
+- [ ] Security passed (link):
+- [ ] Provision/deploy validation (link):
+- [ ] Cost and blast radius reviewed:
+
+## Risk and Rollback
 - Risk level: low / medium / high
-- Rollback plan:
-
-## Deployment Notes
 - Environments affected:
-- Required approvals:
+- Rollback strategy:
+
+## Session Safety
+- [ ] One issue = one primary owner
+- [ ] One branch = one implementation owner
+- [ ] One-file-one-agent rule respected
+- [ ] Review role is separate from implementation
