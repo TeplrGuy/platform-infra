@@ -22,3 +22,8 @@ This repository owns shared Azure infrastructure for the demo environment across
 - Read minimally: issue/PR body, changed files, and referenced constraints first.
 - Do not paste long logs/files; link them and summarize with concise bullets.
 - Keep outputs short, evidence-first, and action-oriented.
+
+## APM-aligned operations
+- Apply `.github/instructions/apm-aligned-agent-ops.md` for deterministic context loading and cost governance.
+- Keep issue/PR outputs concise and evidence-first.
+- Respect workflow safe-output limits and `max-ai-credits` guardrails.

@@ -3,6 +3,7 @@ description: Review pull requests — blast radius analysis, risk assessment, Ia
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+roles: [admin, maintainer, write]
 permissions:
   copilot-requests: write
   contents: read
