@@ -1,0 +1,38 @@
+name: epic-load-test-checkpoint
+
+on:
+  workflow_dispatch:
+    inputs:
+      epic_id:
+        description: "Epic or issue identifier (example: portal-web#2)"
+        required: true
+        type: string
+      load_test_required:
+        description: "Is a load test required for this checkpoint?"
+        required: true
+        type: boolean
+      load_test_run_url:
+        description: "URL to the load test run evidence (required when load_test_required=true)"
+        required: false
+        type: string
+      rationale:
+        description: "Decision rationale (required if load test is not required)"
+        required: true
+        type: string
+
+jobs:
+  validate-checkpoint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate decision inputs
+        run: |
+          if [[ "${{ inputs.load_test_required }}" == "true" && -z "${{ inputs.load_test_run_url }}" ]]; then
+            echo "load_test_run_url is required when load_test_required=true"
+            exit 1
+          fi
+      - name: Emit cost-governed checkpoint summary
+        run: |
+          echo "Epic: ${{ inputs.epic_id }}"
+          echo "Load test required: ${{ inputs.load_test_required }}"
+          echo "Load test run URL: ${{ inputs.load_test_run_url }}"
+          echo "Rationale: ${{ inputs.rationale }}"
