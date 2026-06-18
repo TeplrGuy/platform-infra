@@ -3,7 +3,7 @@ description: Triage incoming issues — classify, blast radius analysis, risk, c
 on:
   issues:
     types: [opened, edited, reopened]
-roles: [admin, maintainer, write]
+  roles: [admin, maintainer, write]
 permissions:
   copilot-requests: write
   contents: read
