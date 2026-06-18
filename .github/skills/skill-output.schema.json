@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SkillOutput",
+  "type": "object",
+  "required": ["summary", "evidence", "risk", "actions"],
+  "properties": {
+    "summary": { "type": "string", "minLength": 20 },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 8 }
+    },
+    "risk": {
+      "type": "object",
+      "required": ["level", "reason"],
+      "properties": {
+        "level": { "type": "string", "enum": ["low", "medium", "high"] },
+        "reason": { "type": "string", "minLength": 10 }
+      },
+      "additionalProperties": false
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 8 }
+    }
+  },
+  "additionalProperties": false
+}

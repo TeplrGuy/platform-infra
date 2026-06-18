@@ -1,0 +1,12 @@
+{
+  "source_repo": "TeplrGuy/engineering-skills",
+  "channel": "stable",
+  "version": "1.0.0",
+  "skills": [
+    "issue-triage",
+    "pr-review",
+    "test-plan",
+    "contract-impact",
+    "incident-response"
+  ]
+}

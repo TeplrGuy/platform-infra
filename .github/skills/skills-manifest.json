@@ -1,0 +1,42 @@
+{
+  "version": "1.0.0",
+  "channel": "stable",
+  "skills": [
+    {
+      "name": "issue-triage",
+      "version": "v1",
+      "max_input_tokens": 6000,
+      "max_output_tokens": 900
+    },
+    {
+      "name": "pr-review",
+      "version": "v1",
+      "max_input_tokens": 9000,
+      "max_output_tokens": 1200
+    },
+    {
+      "name": "test-plan",
+      "version": "v1",
+      "max_input_tokens": 7000,
+      "max_output_tokens": 1000
+    },
+    {
+      "name": "contract-impact",
+      "version": "v1",
+      "max_input_tokens": 8000,
+      "max_output_tokens": 1200
+    },
+    {
+      "name": "incident-response",
+      "version": "v1",
+      "max_input_tokens": 10000,
+      "max_output_tokens": 1400
+    }
+  ],
+  "required_output_sections": [
+    "summary",
+    "evidence",
+    "risk",
+    "actions"
+  ]
+}

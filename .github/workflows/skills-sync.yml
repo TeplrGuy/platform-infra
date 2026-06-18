@@ -1,0 +1,47 @@
+name: Sync Engineering Skills
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * 1-5"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-skills:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout consumer repo
+        uses: actions/checkout@v4
+
+      - name: Read lock
+        id: lock
+        run: |
+          VERSION=$(jq -r '.version' .github/skills/skills.lock.json)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout central skills repo
+        uses: actions/checkout@v4
+        with:
+          repository: TeplrGuy/engineering-skills
+          path: _skills
+          ref: main
+
+      - name: Sync selected skills
+        run: |
+          rm -rf .github/skills/contracts
+          mkdir -p .github/skills
+          cp -R _skills/skills/* .github/skills/
+          cp _skills/schemas/skill-output.schema.json .github/skills/skill-output.schema.json
+          cp _skills/skills-manifest.json .github/skills/skills-manifest.json
+
+      - name: Create PR when changed
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore(skills): sync engineering skills platform"
+          branch: "chore/skills-sync-${{ steps.lock.outputs.version }}"
+          title: "chore(skills): sync engineering skills platform"
+          body: "Automated sync from TeplrGuy/engineering-skills."
+          labels: automation,skills

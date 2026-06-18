@@ -1,0 +1,26 @@
+name: Validate Skill Outputs
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-skill-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify lock exists
+        run: test -f .github/skills/skills.lock.json
+
+      - name: Verify manifest exists
+        run: test -f .github/skills/skills-manifest.json
+
+      - name: Verify contracts exist
+        run: |
+          test -f .github/skills/issue-triage/v1/SKILL.md
+          test -f .github/skills/pr-review/v1/SKILL.md
