@@ -65,6 +65,8 @@ test('foundation contains no workload or secrets and scopes publisher access to 
     resource.type !== 'Microsoft.KeyVault/vaults/secrets'
   ));
   const roleModule = modules.find(resource => resource.name === 'foundation-role-assignments');
+  assert.deepEqual(roleModule.properties.parameters.appPrincipalIds.value, []);
+  assert.deepEqual(roleModule.properties.parameters.secretPrincipalIds.value, []);
   const publisher = Object.values(roleModule.properties.template.resources)
     .find(resource => resource.name.includes('AcrPush'));
   assert.match(publisher.scope, /Microsoft.ContainerRegistry\/registries/);

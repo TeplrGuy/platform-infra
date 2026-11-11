@@ -96,6 +96,12 @@ jobs:
             echo "failed foundation what-if exit=$code" | tee -a foundation-audit.log
             exit "$code"
           fi
+          if node scripts/validate-foundation-preview.js foundation-what-if.json; then
+            echo "succeeded foundation preview completeness check" | tee -a foundation-audit.log
+          else
+            echo "failed foundation preview completeness check" | tee -a foundation-audit.log
+            exit 1
+          fi
       - name: Preserve foundation preview
         if: always()
         uses: actions/upload-artifact@v4
@@ -202,7 +208,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js
+      - run: node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js
   quality:
     needs: validate-inputs
     uses: ./.github/workflows/full-stack-e2e.yml

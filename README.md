@@ -84,9 +84,12 @@ before the apps. Application creation defaults off via `deployApplications`,
 so a future pipeline can publish images and wait for RBAC propagation before
 creating application revisions. This parameter is not a release pipeline.
 `infra/foundation.bicep` contains the registry, vault, application identities,
-and their scoped role assignments without creating application or database
-resources. The `preview_foundation` input runs a protected read-only what-if;
-it does not apply the foundation.
+and deployer access without creating application or database resources. Its
+first-stage preview omits application role assignments, whose principal IDs
+are unknown until the identities exist. A later protected stage must preview
+and apply those assignments before any application release. The
+`preview_foundation` input runs a read-only what-if; it does not apply the
+foundation.
 The test, production, and rollback workflows remain blocked and must be
 adapted to resource-group-scope deployment and verified before enabling them.
 `infra/rg-rbac-condition.txt` is a proposed Azure RBAC condition for scoped

@@ -39,13 +39,8 @@ module roleAssignments 'modules/role-assignments.bicep' = {
     keyVaultId: keyVault.outputs.id
     registryId: registry.outputs.id
     deployerObjectId: deployerObjectId
-    appPrincipalIds: identities.outputs.principalIds
-    secretPrincipalIds: [
-      identities.outputs.principalIds[0]
-      identities.outputs.principalIds[2]
-      identities.outputs.principalIds[3]
-      identities.outputs.principalIds[4]
-    ]
+    appPrincipalIds: []
+    secretPrincipalIds: []
   }
 }
 
