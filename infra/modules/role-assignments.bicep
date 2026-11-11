@@ -16,6 +16,10 @@ var acrPullRole = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '7f951dda-4ed3-4680-a7ca-43fe172d538d'
 )
+var acrPushRole = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '8311e382-0749-4cb8-b61a-304f252e45ec'
+)
 
 resource keyVault 'Microsoft.KeyVault/vaults@2026-05-15' existing = {
   name: last(split(keyVaultId, '/'))
@@ -30,6 +34,15 @@ resource deployer 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   properties: {
     principalId: deployerObjectId
     roleDefinitionId: secretsOfficerRole
+    principalType: 'ServicePrincipal'
+  }
+}
+resource deployerPush 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(registryId, deployerObjectId, 'AcrPush')
+  scope: registry
+  properties: {
+    principalId: deployerObjectId
+    roleDefinitionId: acrPushRole
     principalType: 'ServicePrincipal'
   }
 }

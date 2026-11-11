@@ -77,6 +77,9 @@ Application identities and registry/Key Vault role assignments are created
 before the apps. Application creation defaults off via `deployApplications`,
 so a future pipeline can publish images and wait for RBAC propagation before
 creating application revisions. This parameter is not a release pipeline.
+`infra/foundation.bicep` contains the registry, vault, application identities,
+and their scoped role assignments without creating application or database
+resources. It has not been applied or validated by Azure what-if.
 The optional `verify_oidc` dispatch input runs a separate, human-approved
 sign-in check against the protected `dev` environment. It grants no RBAC and
 does not deploy resources; the release remains blocked even if it succeeds.

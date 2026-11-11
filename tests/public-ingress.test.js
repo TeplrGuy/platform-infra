@@ -3,16 +3,17 @@ const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 const test = require('node:test');
 
-let compiledTemplate;
-function getTemplate() {
-  if (compiledTemplate) return compiledTemplate;
+const compiledTemplates = new Map();
+function getTemplate(file = 'infra/main.bicep') {
+  if (compiledTemplates.has(file)) return compiledTemplates.get(file);
   const options = { cwd: path.join(__dirname, '..'), encoding: 'utf8' };
   const result = process.platform === 'win32'
-    ? spawnSync('az bicep build --file infra/main.bicep --stdout', { ...options, shell: true })
-    : spawnSync('az', ['bicep', 'build', '--file', 'infra/main.bicep', '--stdout'], options);
+    ? spawnSync(`az bicep build --file ${file} --stdout`, { ...options, shell: true })
+    : spawnSync('az', ['bicep', 'build', '--file', file, '--stdout'], options);
   assert.equal(result.status, 0, result.stderr || result.error?.message);
-  compiledTemplate = JSON.parse(result.stdout);
-  return compiledTemplate;
+  const template = JSON.parse(result.stdout);
+  compiledTemplates.set(file, template);
+  return template;
 }
 
 test('public ingress is opt-in and requires application authentication', () => {
@@ -35,6 +36,28 @@ test('public ingress is opt-in and requires application authentication', () => {
   const auth = resources.find(resource => resource.type === 'Microsoft.App/containerApps/authConfigs');
   assert.equal(auth.condition, "[and(not(parameters('isPlaceholder')), parameters('enableEntraAuth'))]");
   assert.ok(auth.dependsOn.includes('apps'));
+});
+
+test('foundation contains no workload or secrets and scopes publisher access to the registry', () => {
+  const template = getTemplate('infra/foundation.bicep');
+  assert.equal(template.parameters.appNames.minLength, 5);
+  assert.equal(template.parameters.appNames.maxLength, 5);
+  const modules = Object.values(template.resources);
+  assert.deepEqual(modules.map(resource => resource.name).sort(), [
+    'foundation-identities', 'foundation-key-vault', 'foundation-registry', 'foundation-role-assignments'
+  ]);
+  const allResources = modules.flatMap(resource => Object.values(resource.properties.template.resources));
+  assert.ok(allResources.every(resource =>
+    !resource.type.startsWith('Microsoft.App/') &&
+    !resource.type.startsWith('Microsoft.DBforPostgreSQL/') &&
+    resource.type !== 'Microsoft.KeyVault/vaults/secrets'
+  ));
+  const roleModule = modules.find(resource => resource.name === 'foundation-role-assignments');
+  const publisher = Object.values(roleModule.properties.template.resources)
+    .find(resource => resource.name.includes('AcrPush'));
+  assert.match(publisher.scope, /Microsoft.ContainerRegistry\/registries/);
+  assert.equal(publisher.properties.principalId, "[parameters('deployerObjectId')]");
+  assert.match(roleModule.properties.template.variables.acrPushRole, /8311e382-0749-4cb8-b61a-304f252e45ec/);
 });
 
 test('application identities and access exist before the apps that use them', () => {

@@ -112,6 +112,17 @@ module keyVault 'modules/key-vault.bicep' = {
     name: resourceNames.keyVault
     location: location
     tags: tags
+  }
+}
+
+module applicationSecrets 'modules/application-secrets.bicep' = {
+  scope: rg
+  name: 'application-secrets'
+  dependsOn: [
+    keyVault
+  ]
+  params: {
+    keyVaultName: resourceNames.keyVault
     databaseUrl: concat(
       'postgresql://',
       'agenticsadmin:',
@@ -168,6 +179,7 @@ module apps 'modules/container-apps.bicep' = if (deployApplications) {
   scope: rg
   name: 'container-apps'
   dependsOn: [
+    applicationSecrets
     roleAssignments
   ]
   params: {
