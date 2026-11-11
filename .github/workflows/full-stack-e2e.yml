@@ -1,0 +1,61 @@
+name: Full-stack browser rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      portal_ref:
+        description: Portal branch, tag, or commit containing the live browser test
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rehearsal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: platform-infra
+      - uses: actions/checkout@v4
+        with:
+          repository: TeplrGuy/portal-web
+          ref: ${{ inputs.portal_ref }}
+          path: portal-web
+      - uses: actions/checkout@v4
+        with:
+          repository: TeplrGuy/api-gateway
+          path: api-gateway
+      - uses: actions/checkout@v4
+        with:
+          repository: TeplrGuy/orders-service
+          path: orders-service
+      - uses: actions/checkout@v4
+        with:
+          repository: TeplrGuy/inventory-service
+          path: inventory-service
+      - uses: actions/checkout@v4
+        with:
+          repository: TeplrGuy/notifications-service
+          path: notifications-service
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: |
+          for repo in portal-web api-gateway orders-service inventory-service notifications-service; do
+            npm ci --no-audit --no-fund --prefix "$repo"
+          done
+      - name: Install Chromium
+        working-directory: portal-web
+        run: npx playwright install --with-deps chromium
+      - name: Record tested revisions
+        run: |
+          for repo in platform-infra portal-web api-gateway orders-service inventory-service notifications-service; do
+            echo "$repo: $(git -C "$repo" rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Exercise the order journey and verify distributed tracing
+        run: node platform-infra/scripts/validate-telemetry.js
