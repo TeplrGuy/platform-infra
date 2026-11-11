@@ -56,7 +56,11 @@ The manually dispatched workflow accepts a ref for each application and records
 the resolved commit SHAs in its job summary. Supply commit SHAs for repeatable
 cross-repository evidence. It runs lint, syntax, unit and integration tests,
 dependency audits, Playwright, and image builds, plus the durable-state test
-against an ephemeral PostgreSQL service; the browser/trace journey remains in-memory.
+against an ephemeral PostgreSQL service. Built images receive individual
+container health checks against that database; the browser/trace journey remains
+in-memory and does not exercise the built containers end to end.
+The optional `preserve_images` input saves those exact images and their source
+revisions for later promotion; it does not publish or deploy them.
 GitHub requires the workflow to exist on the default branch before it can be
 dispatched. It is not currently a required PR check or a deployment approval.
 
@@ -80,6 +84,10 @@ creating application revisions. This parameter is not a release pipeline.
 `infra/foundation.bicep` contains the registry, vault, application identities,
 and their scoped role assignments without creating application or database
 resources. It has not been applied or validated by Azure what-if.
+`infra/rg-rbac-condition.txt` is a proposed Azure RBAC condition for scoped
+bootstrap: it restricts role assignment writes and deletes to the four required
+registry/vault roles and service principals. It is not effective until attached
+to a role assignment and verified.
 The optional `verify_oidc` dispatch input runs a separate, human-approved
 sign-in check against the protected `dev` environment. It grants no RBAC and
 does not deploy resources; the release remains blocked even if it succeeds.
