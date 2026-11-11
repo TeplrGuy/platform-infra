@@ -33,13 +33,18 @@ on:
         required: true
         default: false
         type: boolean
+      bootstrap_rg:
+        description: Create only the approved dev resource group after protected preview and approval
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 jobs:
   preview-bootstrap:
-    if: ${{ inputs.preview_bootstrap }}
+    if: ${{ inputs.preview_bootstrap || inputs.bootstrap_rg }}
     runs-on: ubuntu-latest
     environment: dev
     timeout-minutes: 10
@@ -70,6 +75,7 @@ jobs:
             echo "failed bootstrap what-if exit=$code" | tee -a deploy-audit.log
             exit "$code"
           fi
+          node scripts/validate-rg-preview.js bootstrap-what-if.json
       - name: Preserve preview and audit
         if: always()
         uses: actions/upload-artifact@v4
@@ -134,7 +140,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --test tests/public-ingress.test.js
+      - run: node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js
   quality:
     needs: validate-inputs
     uses: ./.github/workflows/full-stack-e2e.yml
@@ -144,7 +150,68 @@ jobs:
       orders_ref: ${{ inputs.orders_ref }}
       inventory_ref: ${{ inputs.inventory_ref }}
       notifications_ref: ${{ inputs.notifications_ref }}
+  bootstrap-rg:
+    if: ${{ inputs.bootstrap_rg }}
+    needs: [preview-bootstrap, validate-bicep, quality]
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bootstrap-preview-${{ github.run_id }}
+          path: approved-preview
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck and create the resource group
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "started bootstrap what-if run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee bootstrap-apply-audit.log
+          if az deployment sub what-if \
+            --name "rg-bootstrap-recheck-$GITHUB_RUN_ID" \
+            --location northeurope \
+            --template-file infra/bootstrap-rg.bicep \
+            --no-pretty-print --no-prompt --output json > recheck-what-if.json; then
+            echo "succeeded bootstrap what-if" | tee -a bootstrap-apply-audit.log
+          else
+            code=$?
+            echo "failed bootstrap what-if exit=$code" | tee -a bootstrap-apply-audit.log
+            exit "$code"
+          fi
+          node scripts/validate-rg-preview.js recheck-what-if.json approved-preview/bootstrap-what-if.json
+          echo "started resource-group bootstrap run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee -a bootstrap-apply-audit.log
+          if az deployment sub create \
+            --name "rg-bootstrap-$GITHUB_RUN_ID" \
+            --location northeurope \
+            --template-file infra/bootstrap-rg.bicep \
+            --no-prompt --output json > bootstrap-result.json; then
+            echo "succeeded resource-group bootstrap" | tee -a bootstrap-apply-audit.log
+          else
+            code=$?
+            echo "failed resource-group bootstrap exit=$code" | tee -a bootstrap-apply-audit.log
+            exit "$code"
+          fi
+      - name: Preserve bootstrap evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bootstrap-apply-${{ github.run_id }}
+          path: |
+            bootstrap-apply-audit.log
+            recheck-what-if.json
+            bootstrap-result.json
+          if-no-files-found: warn
   block-unsafe-release:
+    if: ${{ !inputs.bootstrap_rg }}
     needs: [validate-bicep, quality]
     runs-on: ubuntu-latest
     permissions: {}

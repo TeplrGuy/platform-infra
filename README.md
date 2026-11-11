@@ -88,6 +88,9 @@ resource group and saves its result and audit log. Its bootstrap role can create
 or update resource groups throughout the subscription because Azure requires
 subscription scope to create a resource group; it grants no access to workload
 resources or role assignments. Remove this temporary role after bootstrapping.
+The separate `bootstrap_rg` input previews and, after a second protected
+approval and a matching recheck, creates only the approved resource group. It
+does not deploy the application or remove the application release block.
 
 ## GitHub OIDC variables required
 
