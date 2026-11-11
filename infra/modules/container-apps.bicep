@@ -7,6 +7,7 @@ param appNames array
 param containerImage string
 param containerImages object
 param isPlaceholder bool
+param enablePublicIngress bool
 param environmentName string
 param enableEntraAuth bool
 param tags object
@@ -35,7 +36,7 @@ resource apps 'Microsoft.App/containerApps@2026-07-01' = [
       configuration: {
         activeRevisionsMode: 'Single'
         ingress: {
-          external: service.external && !isPlaceholder && enableEntraAuth
+          external: service.external && enablePublicIngress && !isPlaceholder && enableEntraAuth
           targetPort: 3000
           transport: 'auto'
         }

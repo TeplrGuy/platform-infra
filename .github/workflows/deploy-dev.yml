@@ -131,7 +131,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - run: az bicep build --file infra/main.bicep --stdout > /dev/null
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test tests/public-ingress.test.js
   quality:
     needs: validate-inputs
     uses: ./.github/workflows/full-stack-e2e.yml

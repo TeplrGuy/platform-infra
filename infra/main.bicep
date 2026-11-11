@@ -13,6 +13,7 @@ param entraClientSecret string = ''
 param entraClientId string = ''
 param entraTenantId string = subscription().tenantId
 param isPlaceholder bool = true
+param enablePublicIngress bool = false
 param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 param containerImages object = {
   portal: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
@@ -147,6 +148,7 @@ module apps 'modules/container-apps.bicep' = {
     containerImage: containerImage
     containerImages: containerImages
     isPlaceholder: isPlaceholder
+    enablePublicIngress: enablePublicIngress
     environmentName: environmentName
     enableEntraAuth: enableEntraAuth
     tags: tags

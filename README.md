@@ -70,6 +70,9 @@ OIDC and least-privilege RBAC, Bicep what-if, immutable image promotion, secret
 reuse, a `dev` environment approval, and live health checks. Building images in
 the quality gate does not publish or promote them. A future release job must
 serialize deployments without canceling pending or running work.
+Public portal ingress defaults to disabled. A future staged release must first
+create the portal internally, configure and verify Entra authentication, then
+explicitly enable public ingress through the protected deployment pipeline.
 The optional `verify_oidc` dispatch input runs a separate, human-approved
 sign-in check against the protected `dev` environment. It grants no RBAC and
 does not deploy resources; the release remains blocked even if it succeeds.
