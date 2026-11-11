@@ -73,6 +73,11 @@ serialize deployments without canceling pending or running work.
 The optional `verify_oidc` dispatch input runs a separate, human-approved
 sign-in check against the protected `dev` environment. It grants no RBAC and
 does not deploy resources; the release remains blocked even if it succeeds.
+The optional `preview_bootstrap` input runs a read-only ARM what-if for the
+resource group and saves its result and audit log. Its bootstrap role can create
+or update resource groups throughout the subscription because Azure requires
+subscription scope to create a resource group; it grants no access to workload
+resources or role assignments. Remove this temporary role after bootstrapping.
 
 ## GitHub OIDC variables required
 

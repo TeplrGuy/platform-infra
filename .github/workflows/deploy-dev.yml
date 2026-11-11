@@ -28,11 +28,57 @@ on:
         required: true
         default: false
         type: boolean
+      preview_bootstrap:
+        description: Preview the resource group bootstrap without deploying
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 jobs:
+  preview-bootstrap:
+    if: ${{ inputs.preview_bootstrap }}
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview the resource group
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "started bootstrap what-if run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee deploy-audit.log
+          if az deployment sub what-if \
+            --name "rg-bootstrap-preview-$GITHUB_RUN_ID" \
+            --location northeurope \
+            --template-file infra/bootstrap-rg.bicep \
+            --no-pretty-print --no-prompt --output json > bootstrap-what-if.json; then
+            echo "succeeded bootstrap what-if" | tee -a deploy-audit.log
+          else
+            code=$?
+            echo "failed bootstrap what-if exit=$code" | tee -a deploy-audit.log
+            exit "$code"
+          fi
+      - name: Preserve preview and audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bootstrap-preview-${{ github.run_id }}
+          path: |
+            deploy-audit.log
+            bootstrap-what-if.json
+          if-no-files-found: warn
   verify-identity:
     if: ${{ inputs.verify_oidc }}
     runs-on: ubuntu-latest

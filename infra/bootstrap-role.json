@@ -1,0 +1,17 @@
+{
+  "Name": "Agentic SDLC Dev RG Bootstrap 55eb",
+  "IsCustom": true,
+  "Description": "Create or update resource groups and run ARM deployments for the demo bootstrap. Grants no workload resource or role assignment permissions.",
+  "Actions": [
+    "Microsoft.Resources/subscriptions/read",
+    "Microsoft.Resources/subscriptions/resourceGroups/read",
+    "Microsoft.Resources/subscriptions/resourceGroups/write",
+    "Microsoft.Resources/deployments/*"
+  ],
+  "NotActions": [],
+  "DataActions": [],
+  "NotDataActions": [],
+  "AssignableScopes": [
+    "/subscriptions/8fcc5e8e-6540-4288-89e7-849e94290205"
+  ]
+}
