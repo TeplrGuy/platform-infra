@@ -82,6 +82,6 @@ Then configure GitHub Environments `dev`, `test`, and `prod` with approval rules
 1. Start with a GitHub issue and acceptance criteria in one of the service repos.
 2. Implement in a short-lived branch, open a PR, and link the issue.
 3. Use PR checklist + CODEOWNERS + `ci` + `security` workflows as merge gates.
-4. The current deployment workflows provision infrastructure; they do not yet build or promote the application images. Do not treat them as application release gates.
-5. The current rollback workflow deploys a Git ref, not a verified application image. Establish image-based rollback before relying on it for a customer demonstration.
+4. Deployment workflows are deliberately blocked: the templates still use placeholder application images. Implement and verify immutable releases before enabling them.
+5. Rollback is deliberately blocked: redeploying a Git ref does not restore a verified application image. Establish image-based rollback before enabling it.
 6. Use `portal-web` to demonstrate the visible customer flow and link the runtime behavior back to GitHub issues, PRs, and workflows.

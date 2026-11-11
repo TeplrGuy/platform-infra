@@ -12,7 +12,15 @@ permissions:
   contents: read
 
 jobs:
+  block-unsafe-release:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - run: |
+          echo "::error::Disabled: the template still deploys placeholder images. Implement and verify immutable application releases before enabling this workflow."
+          exit 1
   deploy:
+    needs: block-unsafe-release
     runs-on: ubuntu-latest
     environment: prod
     timeout-minutes: 20
