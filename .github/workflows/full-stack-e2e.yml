@@ -1,6 +1,23 @@
 name: Full-stack browser rehearsal
 
 on:
+  workflow_call:
+    inputs:
+      portal_ref:
+        required: true
+        type: string
+      gateway_ref:
+        required: true
+        type: string
+      orders_ref:
+        required: true
+        type: string
+      inventory_ref:
+        required: true
+        type: string
+      notifications_ref:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       portal_ref:
@@ -35,7 +52,7 @@ permissions:
 jobs:
   rehearsal:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16-alpine
@@ -90,6 +107,23 @@ jobs:
       - name: Install Chromium
         working-directory: portal-web
         run: npx playwright install --with-deps chromium
+      - name: Run application quality gates
+        run: |
+          set -euo pipefail
+          for repo in portal-web api-gateway orders-service inventory-service notifications-service; do
+            npm --prefix "$repo" run lint
+            npm --prefix "$repo" run test:syntax
+            npm --prefix "$repo" run test:integration
+            npm --prefix "$repo" audit --audit-level=high
+          done
+          npm --prefix orders-service run test:unit
+          npm --prefix portal-web run test:e2e
+      - name: Build application images
+        run: |
+          set -euo pipefail
+          for repo in portal-web api-gateway orders-service inventory-service notifications-service; do
+            docker build --tag "local-gate/$repo:$GITHUB_RUN_ID" "$repo"
+          done
       - name: Record tested revisions
         run: |
           for repo in platform-infra portal-web api-gateway orders-service inventory-service notifications-service; do

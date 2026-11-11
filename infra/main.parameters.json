@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "value": "northeurope" },
+    "environmentName": { "value": "agentsdlc-dev-55eb" },
+    "sessionId": { "value": "55eb0364-fed8-4fc9-95e3-405ad428b06d" },
+    "deployedBy": { "value": "github-actions" },
+    "createdAt": { "value": "2026-11-11T15:43:42.2240991-05:00" },
+    "deployerObjectId": { "value": "__SET_BY_GITHUB_ACTIONS__" },
+    "entraClientId": { "value": "__SET_BEFORE_DEPLOY__" },
+    "entraTenantId": { "value": "d11cdc76-c6f2-4368-a98f-498e78a7e011" },
+    "isPlaceholder": { "value": true },
+    "containerImage": { "value": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" },
+    "containerImages": {
+      "value": {
+        "portal": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+        "apiGateway": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+        "orders": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+        "inventory": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest",
+        "notifications": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+      }
+    },
+    "resourceNames": {
+      "value": {
+        "resourceGroup": "agtsdlc-dev-rg",
+        "environment": "cae-agentsdlc-dev-55eb",
+        "portal": "ca-agentsdlc-dev-55eb-portal",
+        "apiGateway": "ca-agentsdlc-dev-55eb-apigw",
+        "orders": "ca-agentsdlc-dev-55eb-orders",
+        "inventory": "ca-agentsdlc-dev-55eb-inventory",
+        "notifications": "ca-agentsdlc-dev-55eb-notify",
+        "registry": "cragentsdlcdev55eb",
+        "postgres": "pg-agentsdlc-dev-55eb",
+        "keyVault": "kv-agentsdlc-dev-55eb",
+        "logAnalytics": "log-agentsdlc-dev-55eb",
+        "appInsights": "appi-agentsdlc-dev-55eb"
+      }
+    }
+  }
+}

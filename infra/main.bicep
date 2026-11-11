@@ -1,43 +1,172 @@
 targetScope = 'subscription'
 
-@description('Primary deployment location')
-param location string = 'westeurope'
-
-@description('Environment name (dev/test/prod)')
-param environmentName string
-
-@description('Resource name prefix, lowercase, no spaces')
-param prefix string
-
-var rgName = '${prefix}-${environmentName}-rg'
-var logAnalyticsName = '${prefix}-${environmentName}-law'
-var appInsightsName = '${prefix}-${environmentName}-appi'
-var keyVaultName = toLower('${take(prefix, 12)}${environmentName}kv')
-var serviceBusNamespaceName = toLower('${take(prefix, 18)}${environmentName}bus')
-var containerAppsEnvironmentName = '${prefix}-${environmentName}-cae'
-var containerRegistryName = toLower(replace('${take(prefix, 10)}${environmentName}acr', '-', ''))
-
-resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
-  name: rgName
-  location: location
+param location string = 'northeurope'
+param environmentName string = 'agentsdlc-dev-55eb'
+param sessionId string = '55eb0364-fed8-4fc9-95e3-405ad428b06d'
+param deployedBy string
+param createdAt string
+param deployerObjectId string
+@secure()
+param postgresAdminPassword string
+@secure()
+param entraClientSecret string = ''
+param entraClientId string = ''
+param entraTenantId string = subscription().tenantId
+param isPlaceholder bool = true
+param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+param containerImages object = {
+  portal: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+  apiGateway: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+  orders: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+  inventory: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+  notifications: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+}
+param resourceNames object = {
+  resourceGroup: 'agtsdlc-dev-rg'
+  environment: 'cae-agentsdlc-dev-55eb'
+  portal: 'ca-agentsdlc-dev-55eb-portal'
+  apiGateway: 'ca-agentsdlc-dev-55eb-apigw'
+  orders: 'ca-agentsdlc-dev-55eb-orders'
+  inventory: 'ca-agentsdlc-dev-55eb-inventory'
+  notifications: 'ca-agentsdlc-dev-55eb-notify'
+  registry: 'cragentsdlcdev55eb'
+  postgres: 'pg-agentsdlc-dev-55eb'
+  keyVault: 'kv-agentsdlc-dev-55eb'
+  logAnalytics: 'log-agentsdlc-dev-55eb'
+  appInsights: 'appi-agentsdlc-dev-55eb'
 }
 
-module platform 'platform-resources.bicep' = {
+var rgName = resourceNames.resourceGroup
+var enableEntraAuth = !empty(entraClientId) && !empty(entraClientSecret)
+var tags = {
+  'app-onboard-skill': 'true'
+  'app-onboard-session-id': sessionId
+  'created-at': createdAt
+  environment: environmentName
+  'deployed-by': deployedBy
+}
+
+resource rg 'Microsoft.Resources/resourceGroups@2026-06-01' = {
+  name: rgName
+  location: location
+  tags: tags
+}
+
+module logAnalytics 'modules/log-analytics.bicep' = {
   scope: rg
-  name: 'platform-resources'
+  name: 'log-analytics'
   params: {
+    name: resourceNames.logAnalytics
     location: location
-    prefix: prefix
+    tags: tags
+  }
+}
+
+module appInsights 'modules/app-insights.bicep' = {
+  scope: rg
+  name: 'application-insights'
+  params: {
+    name: resourceNames.appInsights
+    location: location
+    workspaceResourceId: logAnalytics.outputs.id
+    tags: tags
+  }
+}
+
+module registry 'modules/acr.bicep' = {
+  scope: rg
+  name: 'container-registry'
+  params: {
+    name: resourceNames.registry
+    location: location
+    tags: tags
+  }
+}
+
+module postgres 'modules/postgres.bicep' = {
+  scope: rg
+  name: 'postgresql'
+  params: {
+    name: resourceNames.postgres
+    location: location
+    administratorLogin: 'agenticsadmin'
+    administratorLoginPassword: postgresAdminPassword
+    databaseName: 'agenticsdldemo'
+    tags: tags
+  }
+}
+
+module keyVault 'modules/key-vault.bicep' = {
+  scope: rg
+  name: 'key-vault'
+  params: {
+    name: resourceNames.keyVault
+    location: location
+    tags: tags
+    databaseUrl: concat(
+      'postgresql://',
+      'agenticsadmin:',
+      uriComponent(postgresAdminPassword),
+      '@',
+      postgres.outputs.fullyQualifiedDomainName,
+      ':5432/agenticsdldemo?sslmode=require'
+    )
+    entraClientSecret: entraClientSecret
+    enableEntraAuth: enableEntraAuth
+  }
+}
+
+module environment 'modules/container-environment.bicep' = {
+  scope: rg
+  name: 'container-apps-environment'
+  params: {
+    name: resourceNames.environment
+    location: location
+    logAnalyticsCustomerId: logAnalytics.outputs.customerId
+    logAnalyticsSharedKey: logAnalytics.outputs.sharedKey
+    tags: tags
+  }
+}
+
+module apps 'modules/container-apps.bicep' = {
+  scope: rg
+  name: 'container-apps'
+  params: {
+    environmentId: environment.outputs.id
+    environmentDefaultDomain: environment.outputs.defaultDomain
+    registryLoginServer: registry.outputs.loginServer
+    appInsightsConnectionString: appInsights.outputs.connectionString
+    keyVaultUri: keyVault.outputs.vaultUri
+    appNames: [
+      resourceNames.portal
+      resourceNames.apiGateway
+      resourceNames.orders
+      resourceNames.inventory
+      resourceNames.notifications
+    ]
+    containerImage: containerImage
+    containerImages: containerImages
+    isPlaceholder: isPlaceholder
     environmentName: environmentName
-    logAnalyticsName: logAnalyticsName
-    appInsightsName: appInsightsName
-    keyVaultName: keyVaultName
-    serviceBusNamespaceName: serviceBusNamespaceName
-    containerAppsEnvironmentName: containerAppsEnvironmentName
-    containerRegistryName: containerRegistryName
+    enableEntraAuth: enableEntraAuth
+    tags: tags
+    entraClientId: entraClientId
+    entraTenantId: entraTenantId
+  }
+}
+
+module roleAssignments 'modules/role-assignments.bicep' = {
+  scope: rg
+  name: 'role-assignments'
+  params: {
+    keyVaultId: keyVault.outputs.id
+    registryId: registry.outputs.id
+    deployerObjectId: deployerObjectId
+    appPrincipalIds: apps.outputs.principalIds
   }
 }
 
 output resourceGroupName string = rgName
-output containerAppsEnvironmentId string = platform.outputs.containerAppsEnvironmentId
-output containerRegistryLoginServer string = platform.outputs.containerRegistryLoginServer
+output containerRegistryLoginServer string = registry.outputs.loginServer
+output containerAppsEnvironmentId string = environment.outputs.id
+output containerAppNames array = apps.outputs.names

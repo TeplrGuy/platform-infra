@@ -6,10 +6,6 @@ on:
   push:
     branches: [ main ]
 
-concurrency:
-  group: infra-ci-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   validate-bicep:
     runs-on: ubuntu-latest

@@ -5,8 +5,8 @@ Infrastructure baseline for the SDLC demo platform in **North Europe**.
 ## What this repo contains
 
 - `infra/main.bicep`: Subscription-level deployment entry point
-- `infra/platform-resources.bicep`: Core shared platform resources and Container Apps
-- `infra/main.dev.bicepparam`: Dev environment parameters
+- `infra/modules/`: Dev infrastructure modules
+- `infra/main.parameters.json`: Planned dev environment parameters
 - `infra/main.test.bicepparam`: Test environment parameters
 - `infra/main.prod.bicepparam`: Prod environment parameters
 - `.github/workflows/infra-ci.yml`: Bicep validation workflow
@@ -54,45 +54,38 @@ before using real customer data. Local instrumentation can instead use
 
 The manually dispatched workflow accepts a ref for each application and records
 the resolved commit SHAs in its job summary. Supply commit SHAs for repeatable
-cross-repository evidence. It also runs the durable-state test against an
-ephemeral PostgreSQL service; the browser/trace journey remains in-memory.
+cross-repository evidence. It runs lint, syntax, unit and integration tests,
+dependency audits, Playwright, and image builds, plus the durable-state test
+against an ephemeral PostgreSQL service; the browser/trace journey remains in-memory.
 GitHub requires the workflow to exist on the default branch before it can be
 dispatched. It is not currently a required PR check or a deployment approval.
 
-## Resources provisioned
+## Deployment status
 
-- Azure Container Apps Environment
-- Azure Container Registry
-- Container Apps:
-  - `portal` (external ingress)
-  - `apigw` (external ingress)
-  - `orders` (internal ingress)
-  - `inventory` (internal ingress)
-  - `notify` (internal ingress)
-- Azure Key Vault
-- Azure Service Bus namespace
-- Log Analytics workspace
-- Application Insights
-
-## Deploy (example)
-
-```bash
-az deployment sub create \
-  --name dev-bootstrap \
-  --location northeurope \
-  --template-file infra/main.bicep \
-  --parameters infra/main.dev.bicepparam
-```
+The dev release workflow is intentionally blocked and performs no deployment.
+It requires five full commit SHAs and runs Bicep and application quality gates
+before the block. Azure provisioning and releases must use GitHub Actions, not
+local or portal commands. Before the block can be removed, implement and verify
+OIDC and least-privilege RBAC, Bicep what-if, immutable image promotion, secret
+reuse, a `dev` environment approval, and live health checks. Building images in
+the quality gate does not publish or promote them. A future release job must
+serialize deployments without canceling pending or running work.
+The optional `verify_oidc` dispatch input runs a separate, human-approved
+sign-in check against the protected `dev` environment. It grants no RBAC and
+does not deploy resources; the release remains blocked even if it succeeds.
 
 ## GitHub OIDC variables required
 
-Set these repository variables in `platform-infra`:
+Set these variables on the `platform-infra` `dev` environment:
 
 - `AZURE_CLIENT_ID`
 - `AZURE_TENANT_ID` (`d11cdc76-c6f2-4368-a98f-498e78a7e011`)
 - `AZURE_SUBSCRIPTION_ID` (`8fcc5e8e-6540-4288-89e7-849e94290205`)
 
-Then configure GitHub Environments `dev`, `test`, and `prod` with approval rules.
+The `dev` environment requires an approved human reviewer and disables admin
+bypass. Self-review is allowed because TeplrGuy is the only available reviewer;
+this is not independent review. Configure and verify appropriate protection for
+`test` and `prod` before enabling those releases.
 
 ## Customer walkthrough (day-in-the-life)
 

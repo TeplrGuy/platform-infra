@@ -2,40 +2,104 @@ name: deploy-dev
 
 on:
   workflow_dispatch:
-
-concurrency:
-  group: deploy-dev-${{ github.ref }}
-  cancel-in-progress: false
+    inputs:
+      portal_ref:
+        description: Portal commit SHA
+        required: true
+        type: string
+      gateway_ref:
+        description: Gateway commit SHA
+        required: true
+        type: string
+      orders_ref:
+        description: Orders commit SHA
+        required: true
+        type: string
+      inventory_ref:
+        description: Inventory commit SHA
+        required: true
+        type: string
+      notifications_ref:
+        description: Notifications commit SHA
+        required: true
+        type: string
+      verify_oidc:
+        description: Request a protected, non-deploying Azure OIDC sign-in check
+        required: true
+        default: false
+        type: boolean
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
+  verify-identity:
+    if: ${{ inputs.verify_oidc }}
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Verify the token tenant
+        env:
+          EXPECTED_TENANT: ${{ vars.AZURE_TENANT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tenant="$(az account get-access-token --resource https://management.azure.com/ --query tenant -o tsv)"
+          if [[ -z "$EXPECTED_TENANT" || "$tenant" != "$EXPECTED_TENANT" ]]; then
+            echo "::error::Azure token tenant does not match the configured tenant."
+            exit 1
+          fi
+          echo "OIDC sign-in succeeded. No Azure resource or RBAC changes were made."
+  validate-inputs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PORTAL_REF: ${{ inputs.portal_ref }}
+      GATEWAY_REF: ${{ inputs.gateway_ref }}
+      ORDERS_REF: ${{ inputs.orders_ref }}
+      INVENTORY_REF: ${{ inputs.inventory_ref }}
+      NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+    steps:
+      - name: Require immutable application revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for ref in "$PORTAL_REF" "$GATEWAY_REF" "$ORDERS_REF" "$INVENTORY_REF" "$NOTIFICATIONS_REF"; do
+            if [[ ! "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Each application revision must be a full lowercase Git commit SHA."
+              exit 1
+            fi
+          done
+  validate-bicep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: az bicep build --file infra/main.bicep --stdout > /dev/null
+  quality:
+    needs: validate-inputs
+    uses: ./.github/workflows/full-stack-e2e.yml
+    with:
+      portal_ref: ${{ inputs.portal_ref }}
+      gateway_ref: ${{ inputs.gateway_ref }}
+      orders_ref: ${{ inputs.orders_ref }}
+      inventory_ref: ${{ inputs.inventory_ref }}
+      notifications_ref: ${{ inputs.notifications_ref }}
   block-unsafe-release:
+    needs: [validate-bicep, quality]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
       - run: |
-          echo "::error::Disabled: the template still deploys placeholder images. Implement and verify immutable application releases before enabling this workflow."
+          echo "::error::Deployment remains disabled: OIDC, what-if, immutable image promotion and the protected release job are not implemented."
           exit 1
-  deploy:
-    needs: block-unsafe-release
-    runs-on: ubuntu-latest
-    environment: dev
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - uses: azure/cli@v2
-        with:
-          inlineScript: |
-            az deployment sub create \
-              --name platform-dev-${{ github.run_id }} \
-              --location northeurope \
-              --template-file infra/main.bicep \
-              --parameters infra/main.dev.bicepparam
