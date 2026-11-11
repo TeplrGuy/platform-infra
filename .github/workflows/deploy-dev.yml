@@ -38,6 +38,11 @@ on:
         required: true
         default: false
         type: boolean
+      preserve_images:
+        description: Preserve the built and smoke-tested images without publishing them
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -150,6 +155,7 @@ jobs:
       orders_ref: ${{ inputs.orders_ref }}
       inventory_ref: ${{ inputs.inventory_ref }}
       notifications_ref: ${{ inputs.notifications_ref }}
+      preserve_images: ${{ inputs.preserve_images }}
   bootstrap-rg:
     if: ${{ inputs.bootstrap_rg }}
     needs: [preview-bootstrap, validate-bicep, quality]
