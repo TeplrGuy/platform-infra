@@ -36,7 +36,11 @@ async function unusedPort() {
 async function startService(name, entry, port, extraEnv) {
   const child = spawn(process.execPath, [entry], {
     cwd: path.join(root, name),
-    env: { ...serviceEnv, ...extraEnv, PORT: String(port), ENVIRONMENT_NAME: 'e2e' },
+    env: {
+      ...serviceEnv, ...extraEnv, PORT: String(port),
+      ENVIRONMENT_NAME: ['orders-service', 'inventory-service', 'notifications-service'].includes(name) ? 'local' : 'e2e',
+      DATABASE_URL: '', NODE_ENV: 'test'
+    },
     stdio: 'inherit'
   });
   children.push(child);

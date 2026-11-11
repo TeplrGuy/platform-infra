@@ -25,6 +25,19 @@ With Node.js 24 installed, clone `portal-web`, `api-gateway`, `orders-service`, 
 local services, runs the real browser flow, and stops its child processes. State
 is in memory and is lost when the services stop.
 
+The application Dockerfiles default to the public npm registry. In an
+environment that requires a trusted registry mirror, supply its HTTPS URL as
+the `NPM_CONFIG_REGISTRY` Docker build argument. Do not put credentials in the
+URL or build arguments; use a secure build-time secret mechanism if needed.
+
+For the durable-state integration check, install the service dependencies and
+set `TEST_DATABASE_URL` to an isolated PostgreSQL database whose name ends in
+`_test`. Run `node --test tests/postgres-state.test.js` from `platform-infra`,
+with the application repositories cloned beside it. The check creates and deletes a uniquely
+named schema, starts multiple replicas, and exercises concurrent reservations,
+duplicate orders, and service restarts. It skips when `TEST_DATABASE_URL` is
+unset. Do not point it at a shared or production database.
+
 Run `node scripts/validate-telemetry.js` to additionally start a local OTLP
 collector and assert that a single trace reaches all five services. The
 rehearsal removes inherited Azure Monitor settings and only accepts a loopback
@@ -41,9 +54,10 @@ before using real customer data. Local instrumentation can instead use
 
 The manually dispatched workflow accepts a ref for each application and records
 the resolved commit SHAs in its job summary. Supply commit SHAs for repeatable
-cross-repository evidence. GitHub requires the workflow to exist on the default
-branch before it can be dispatched. It is not currently a required PR check or
-a deployment approval.
+cross-repository evidence. It also runs the durable-state test against an
+ephemeral PostgreSQL service; the browser/trace journey remains in-memory.
+GitHub requires the workflow to exist on the default branch before it can be
+dispatched. It is not currently a required PR check or a deployment approval.
 
 ## Resources provisioned
 
