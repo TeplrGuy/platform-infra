@@ -1,4 +1,4 @@
-targetScope = 'subscription'
+targetScope = 'resourceGroup'
 
 param location string = 'northeurope'
 param environmentName string = 'agentsdlc-dev-55eb'
@@ -24,7 +24,6 @@ param containerImages object = {
   notifications: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 }
 param resourceNames object = {
-  resourceGroup: 'agtsdlc-dev-rg'
   environment: 'cae-agentsdlc-dev-55eb'
   portal: 'ca-agentsdlc-dev-55eb-portal'
   apiGateway: 'ca-agentsdlc-dev-55eb-apigw'
@@ -38,7 +37,6 @@ param resourceNames object = {
   appInsights: 'appi-agentsdlc-dev-55eb'
 }
 
-var rgName = resourceNames.resourceGroup
 var enableEntraAuth = !empty(entraClientId) && !empty(entraClientSecret)
 var appNames = [
   resourceNames.portal
@@ -55,14 +53,7 @@ var tags = {
   'deployed-by': deployedBy
 }
 
-resource rg 'Microsoft.Resources/resourceGroups@2026-06-01' = {
-  name: rgName
-  location: location
-  tags: tags
-}
-
 module logAnalytics 'modules/log-analytics.bicep' = {
-  scope: rg
   name: 'log-analytics'
   params: {
     name: resourceNames.logAnalytics
@@ -72,7 +63,6 @@ module logAnalytics 'modules/log-analytics.bicep' = {
 }
 
 module appInsights 'modules/app-insights.bicep' = {
-  scope: rg
   name: 'application-insights'
   params: {
     name: resourceNames.appInsights
@@ -83,7 +73,6 @@ module appInsights 'modules/app-insights.bicep' = {
 }
 
 module registry 'modules/acr.bicep' = {
-  scope: rg
   name: 'container-registry'
   params: {
     name: resourceNames.registry
@@ -93,7 +82,6 @@ module registry 'modules/acr.bicep' = {
 }
 
 module postgres 'modules/postgres.bicep' = {
-  scope: rg
   name: 'postgresql'
   params: {
     name: resourceNames.postgres
@@ -106,7 +94,6 @@ module postgres 'modules/postgres.bicep' = {
 }
 
 module keyVault 'modules/key-vault.bicep' = {
-  scope: rg
   name: 'key-vault'
   params: {
     name: resourceNames.keyVault
@@ -116,7 +103,6 @@ module keyVault 'modules/key-vault.bicep' = {
 }
 
 module applicationSecrets 'modules/application-secrets.bicep' = {
-  scope: rg
   name: 'application-secrets'
   dependsOn: [
     keyVault
@@ -137,7 +123,6 @@ module applicationSecrets 'modules/application-secrets.bicep' = {
 }
 
 module environment 'modules/container-environment.bicep' = {
-  scope: rg
   name: 'container-apps-environment'
   params: {
     name: resourceNames.environment
@@ -149,7 +134,6 @@ module environment 'modules/container-environment.bicep' = {
 }
 
 module identities 'modules/managed-identities.bicep' = {
-  scope: rg
   name: 'application-identities'
   params: {
     appNames: appNames
@@ -159,7 +143,6 @@ module identities 'modules/managed-identities.bicep' = {
 }
 
 module roleAssignments 'modules/role-assignments.bicep' = {
-  scope: rg
   name: 'role-assignments'
   params: {
     keyVaultId: keyVault.outputs.id
@@ -176,7 +159,6 @@ module roleAssignments 'modules/role-assignments.bicep' = {
 }
 
 module apps 'modules/container-apps.bicep' = if (deployApplications) {
-  scope: rg
   name: 'container-apps'
   dependsOn: [
     applicationSecrets
@@ -202,7 +184,7 @@ module apps 'modules/container-apps.bicep' = if (deployApplications) {
   }
 }
 
-output resourceGroupName string = rgName
+output resourceGroupName string = resourceGroup().name
 output containerRegistryLoginServer string = registry.outputs.loginServer
 output containerAppsEnvironmentId string = environment.outputs.id
 output containerAppNames array = deployApplications ? apps.outputs.names : []

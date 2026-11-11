@@ -169,4 +169,4 @@ jobs:
           name: verified-images-${{ github.run_id }}-${{ github.run_attempt }}
           path: release-images/
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 30

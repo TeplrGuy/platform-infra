@@ -4,7 +4,7 @@ Infrastructure baseline for the SDLC demo platform in **North Europe**.
 
 ## What this repo contains
 
-- `infra/main.bicep`: Subscription-level deployment entry point
+- `infra/main.bicep`: Resource-group-level application deployment entry point
 - `infra/modules/`: Dev infrastructure modules
 - `infra/main.parameters.json`: Planned dev environment parameters
 - `infra/main.test.bicepparam`: Test environment parameters
@@ -60,7 +60,9 @@ against an ephemeral PostgreSQL service. Built images receive individual
 container health checks against that database; the browser/trace journey remains
 in-memory and does not exercise the built containers end to end.
 The optional `preserve_images` input saves those exact images and their source
-revisions for later promotion; it does not publish or deploy them.
+revisions for later promotion; it does not publish or deploy them. The manifest
+records local image IDs, not registry manifest digests. A future publisher must
+verify the archive and record immutable registry digests after pushing.
 GitHub requires the workflow to exist on the default branch before it can be
 dispatched. It is not currently a required PR check or a deployment approval.
 
@@ -83,11 +85,15 @@ so a future pipeline can publish images and wait for RBAC propagation before
 creating application revisions. This parameter is not a release pipeline.
 `infra/foundation.bicep` contains the registry, vault, application identities,
 and their scoped role assignments without creating application or database
-resources. It has not been applied or validated by Azure what-if.
+resources. The `preview_foundation` input runs a protected read-only what-if;
+it does not apply the foundation.
+The test, production, and rollback workflows remain blocked and must be
+adapted to resource-group-scope deployment and verified before enabling them.
 `infra/rg-rbac-condition.txt` is a proposed Azure RBAC condition for scoped
 bootstrap: it restricts role assignment writes and deletes to the four required
-registry/vault roles and service principals. It is not effective until attached
-to a role assignment and verified.
+registry/vault roles and service principals. The deployment identity has this
+condition at the demo resource group; functional enforcement still needs to be
+verified through the pipeline.
 The optional `verify_oidc` dispatch input runs a separate, human-approved
 sign-in check against the protected `dev` environment. It grants no RBAC and
 does not deploy resources; the release remains blocked even if it succeeds.

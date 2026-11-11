@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
+const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
@@ -18,6 +19,9 @@ function getTemplate(file = 'infra/main.bicep') {
 
 test('public ingress is opt-in and requires application authentication', () => {
   const template = getTemplate();
+  assert.match(template.$schema, /\/deploymentTemplate\.json#/);
+  assert.equal(template.outputs.resourceGroupName.value, '[resourceGroup().name]');
+  assert.ok(Object.values(template.resources).every(resource => resource.type !== 'Microsoft.Resources/resourceGroups'));
   assert.equal(template.parameters.enablePublicIngress.defaultValue, false);
   assert.equal(
     template.variables.enableEntraAuth,
@@ -40,6 +44,14 @@ test('public ingress is opt-in and requires application authentication', () => {
 
 test('foundation contains no workload or secrets and scopes publisher access to the registry', () => {
   const template = getTemplate('infra/foundation.bicep');
+  const foundation = JSON.parse(readFileSync(path.join(__dirname, '../infra/foundation.parameters.json')));
+  const application = JSON.parse(readFileSync(path.join(__dirname, '../infra/main.parameters.json')));
+  const names = application.parameters.resourceNames.value;
+  assert.equal(foundation.parameters.registryName.value, names.registry);
+  assert.equal(foundation.parameters.keyVaultName.value, names.keyVault);
+  assert.deepEqual(foundation.parameters.appNames.value,
+    [names.portal, names.apiGateway, names.orders, names.inventory, names.notifications]);
+  assert.equal(foundation.parameters.location.value, application.parameters.location.value);
   assert.equal(template.parameters.appNames.minLength, 5);
   assert.equal(template.parameters.appNames.maxLength, 5);
   const modules = Object.values(template.resources);

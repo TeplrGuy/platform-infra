@@ -43,11 +43,68 @@ on:
         required: true
         default: false
         type: boolean
+      preview_foundation:
+        description: Preview the registry and vault foundation without deploying it
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 jobs:
+  preview-foundation:
+    if: ${{ inputs.preview_foundation }}
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview the resource-group foundation
+        env:
+          DEPLOYER_OBJECT_ID: ${{ vars.AZURE_DEPLOYER_OBJECT_ID }}
+          TARGET_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TARGET_TENANT: ${{ vars.AZURE_TENANT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$DEPLOYER_OBJECT_ID" != "b6a3c39d-0263-4f01-b975-654cdea443a0" ||
+                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
+                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+            echo "::error::The identity, tenant, or subscription does not match the approved target."
+            exit 1
+          fi
+          echo "started foundation what-if run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee foundation-audit.log
+          if az deployment group what-if \
+            --name "foundation-preview-$GITHUB_RUN_ID" \
+            --resource-group agtsdlc-dev-rg \
+            --template-file infra/foundation.bicep \
+            --parameters infra/foundation.parameters.json deployerObjectId="$DEPLOYER_OBJECT_ID" \
+            --no-pretty-print --no-prompt --output json > foundation-what-if.json; then
+            echo "succeeded foundation what-if" | tee -a foundation-audit.log
+          else
+            code=$?
+            echo "failed foundation what-if exit=$code" | tee -a foundation-audit.log
+            exit "$code"
+          fi
+      - name: Preserve foundation preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundation-preview-${{ github.run_id }}
+          path: |
+            foundation-audit.log
+            foundation-what-if.json
+          if-no-files-found: warn
   preview-bootstrap:
     if: ${{ inputs.preview_bootstrap || inputs.bootstrap_rg }}
     runs-on: ubuntu-latest

@@ -23,7 +23,6 @@
     },
     "resourceNames": {
       "value": {
-        "resourceGroup": "agtsdlc-dev-rg",
         "environment": "cae-agentsdlc-dev-55eb",
         "portal": "ca-agentsdlc-dev-55eb-portal",
         "apiGateway": "ca-agentsdlc-dev-55eb-apigw",
