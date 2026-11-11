@@ -8,7 +8,7 @@ permissions:
   contents: read
   issues: read
 tracker-id: infra-drift-weekly
-max-ai-credits: 4
+max-ai-credits: 250
 safe-outputs:
   create-issue:
     title-prefix: "[infra-drift] "

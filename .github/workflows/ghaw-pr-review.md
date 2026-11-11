@@ -11,7 +11,7 @@ permissions:
   pull-requests: read
   actions: read
 tracker-id: infra-pr-review
-max-ai-credits: 4
+max-ai-credits: 250
 safe-outputs:
   add-comment:
     max: 1
