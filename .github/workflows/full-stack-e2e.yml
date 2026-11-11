@@ -4,7 +4,27 @@ on:
   workflow_dispatch:
     inputs:
       portal_ref:
-        description: Portal branch, tag, or commit containing the live browser test
+        description: Portal commit SHA or ref containing the live browser test
+        required: true
+        default: main
+        type: string
+      gateway_ref:
+        description: Gateway commit SHA or ref
+        required: true
+        default: main
+        type: string
+      orders_ref:
+        description: Orders commit SHA or ref
+        required: true
+        default: main
+        type: string
+      inventory_ref:
+        description: Inventory commit SHA or ref
+        required: true
+        default: main
+        type: string
+      notifications_ref:
+        description: Notifications commit SHA or ref
         required: true
         default: main
         type: string
@@ -28,18 +48,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: TeplrGuy/api-gateway
+          ref: ${{ inputs.gateway_ref }}
           path: api-gateway
       - uses: actions/checkout@v4
         with:
           repository: TeplrGuy/orders-service
+          ref: ${{ inputs.orders_ref }}
           path: orders-service
       - uses: actions/checkout@v4
         with:
           repository: TeplrGuy/inventory-service
+          ref: ${{ inputs.inventory_ref }}
           path: inventory-service
       - uses: actions/checkout@v4
         with:
           repository: TeplrGuy/notifications-service
+          ref: ${{ inputs.notifications_ref }}
           path: notifications-service
       - uses: actions/setup-node@v4
         with:

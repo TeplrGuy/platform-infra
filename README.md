@@ -39,9 +39,11 @@ values are redacted. Review telemetry and retention for your data classification
 before using real customer data. Local instrumentation can instead use
 `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
-The manually dispatched workflow tests the chosen portal ref with the other
-repositories' default branches; record commit SHAs when using it as evidence.
-It is not currently a required PR check or a deployment approval.
+The manually dispatched workflow accepts a ref for each application and records
+the resolved commit SHAs in its job summary. Supply commit SHAs for repeatable
+cross-repository evidence. GitHub requires the workflow to exist on the default
+branch before it can be dispatched. It is not currently a required PR check or
+a deployment approval.
 
 ## Resources provisioned
 
