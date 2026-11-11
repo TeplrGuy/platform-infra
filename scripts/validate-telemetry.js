@@ -7,6 +7,41 @@ async function main() {
   const traces = [];
   const telemetry = [];
   let collectorError;
+  let browserComplete = false;
+  let child;
+  let notified = false;
+  let observedInventoryReads = 0;
+  let observedTraces = [];
+  let observedRoutes = [];
+  function notifyWhenComplete() {
+    if (!browserComplete || notified) return;
+    const servicesByTrace = new Map();
+    const routes = new Set();
+    let inventoryReads = 0;
+    for (const payload of traces) {
+      for (const resource of payload.resourceSpans || []) {
+        const service = resource.resource.attributes.find(item => item.key === 'service.name')?.value.stringValue;
+        for (const scope of resource.scopeSpans || []) {
+          for (const span of scope.spans || []) {
+            const route = span.attributes?.find(item => item.key === 'http.route')?.value.stringValue;
+            if (route) routes.add(route);
+            if (service === 'inventory-service' && route === '/inventory/:sku') inventoryReads++;
+            if (!servicesByTrace.has(span.traceId)) servicesByTrace.set(span.traceId, new Set());
+            servicesByTrace.get(span.traceId).add(service);
+          }
+        }
+      }
+    }
+    const expected = ['portal-web', 'api-gateway', 'orders-service', 'inventory-service', 'notifications-service'];
+    observedInventoryReads = inventoryReads;
+    observedTraces = [...servicesByTrace.values()].map(services => [...services]);
+    observedRoutes = [...routes];
+    if ([...servicesByTrace.values()].some(services => expected.every(service => services.has(service))) &&
+        routes.has('/api/orders/:orderId') && inventoryReads >= 3) {
+      notified = true;
+      child.send('telemetry-complete');
+    }
+  }
   const collector = http.createServer((request, response) => {
     let body = '';
     request.setEncoding('utf8');
@@ -18,6 +53,7 @@ async function main() {
         if (request.url === '/v1/traces') traces.push(payload);
         response.writeHead(200, { 'content-type': 'application/json' });
         response.end('{}');
+        notifyWhenComplete();
       } catch (error) {
         collectorError = error;
         response.writeHead(400).end();
@@ -35,14 +71,20 @@ async function main() {
       if (key.startsWith('OTEL_') || key === 'APPLICATIONINSIGHTS_CONNECTION_STRING') delete env[key];
     }
     env.FULL_STACK_LOCAL_OTLP_ENDPOINT = `http://127.0.0.1:${collector.address().port}`;
-    const child = spawn(process.execPath, [path.join(__dirname, 'full-stack-e2e.js')], {
-      env, stdio: 'inherit'
+    child = spawn(process.execPath, [path.join(__dirname, 'full-stack-e2e.js')], {
+      env, stdio: ['inherit', 'inherit', 'inherit', 'ipc']
+    });
+    child.on('message', message => {
+      if (message === 'browser-complete') {
+        browserComplete = true;
+        notifyWhenComplete();
+      }
     });
     const exitCode = await new Promise((resolve, reject) => {
       child.once('error', reject);
       child.once('exit', (code, signal) => signal ? reject(new Error(`Rehearsal terminated by ${signal}`)) : resolve(code));
     });
-    assert.equal(exitCode, 0, 'full-stack browser rehearsal failed');
+    assert.equal(exitCode, 0, `full-stack browser rehearsal failed; ${traces.length} trace exports, ${observedInventoryReads} inventory reads, traces ${JSON.stringify(observedTraces)}, routes ${JSON.stringify(observedRoutes)}`);
     await new Promise(resolve => setTimeout(resolve, 500));
     if (collectorError) throw collectorError;
     const exposedKeys = new Set();

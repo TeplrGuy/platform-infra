@@ -28,8 +28,9 @@ is in memory and is lost when the services stop.
 Run `node scripts/validate-telemetry.js` to additionally start a local OTLP
 collector and assert that a single trace reaches all five services. The
 rehearsal removes inherited Azure Monitor settings and only accepts a loopback
-telemetry collector. This checks propagation locally; it does not verify Azure
-Monitor ingestion, alerts, or an SRE Agent connection.
+telemetry collector. It samples every local trace and waits for the expected
+exports before stopping the services. This does not change production sampling
+or verify Azure Monitor ingestion, alerts, or an SRE Agent connection.
 
 When `APPLICATIONINSIGHTS_CONNECTION_STRING` is set, each service initializes
 Microsoft OpenTelemetry before loading Express. Traces propagate through Node's

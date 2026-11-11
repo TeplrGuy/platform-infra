@@ -16,6 +16,7 @@ if (process.env.FULL_STACK_LOCAL_OTLP_ENDPOINT) {
   Object.assign(serviceEnv, {
     OTEL_EXPORTER_OTLP_ENDPOINT: endpoint.origin,
     OTEL_EXPORTER_OTLP_PROTOCOL: 'http/json',
+    OTEL_TRACES_SAMPLER: 'always_on',
     OTEL_BSP_SCHEDULE_DELAY: '100',
     OTEL_METRIC_EXPORT_INTERVAL: '1000'
   });
@@ -82,6 +83,22 @@ async function main() {
     playwright.once('exit', (code, signal) => signal ? reject(new Error(`Playwright terminated by ${signal}`)) : resolve(code));
   });
   if (exitCode !== 0) throw new Error(`Playwright failed with exit code ${exitCode}`);
+  if (process.env.FULL_STACK_LOCAL_OTLP_ENDPOINT && process.send) {
+    await new Promise((resolve, reject) => {
+      function onMessage(message) {
+        clearTimeout(timeout);
+        if (message === 'telemetry-complete') resolve();
+        else reject(new Error('Unexpected telemetry collector response'));
+      }
+      const timeout = setTimeout(() => {
+        process.removeListener('message', onMessage);
+        process.disconnect();
+        reject(new Error('Timed out waiting for telemetry export'));
+      }, 15000);
+      process.once('message', onMessage);
+      process.send('browser-complete');
+    });
+  }
 }
 
 main().catch(error => {
