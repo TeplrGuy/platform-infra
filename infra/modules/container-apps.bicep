@@ -4,6 +4,7 @@ param registryLoginServer string
 param appInsightsConnectionString string
 param keyVaultUri string
 param appNames array
+param identityIds array
 param containerImage string
 param containerImages object
 param isPlaceholder bool
@@ -30,7 +31,12 @@ resource apps 'Microsoft.App/containerApps@2026-07-01' = [
     name: names[i]
     location: resourceGroup().location
     tags: tags
-    identity: { type: 'SystemAssigned' }
+    identity: {
+      type: 'UserAssigned'
+      userAssignedIdentities: {
+        '${identityIds[i]}': {}
+      }
+    }
     properties: {
       managedEnvironmentId: environmentId
       configuration: {
@@ -43,7 +49,7 @@ resource apps 'Microsoft.App/containerApps@2026-07-01' = [
         registries: isPlaceholder
           ? []
           : [
-              { server: registryLoginServer, identity: 'system' }
+              { server: registryLoginServer, identity: identityIds[i] }
             ]
         secrets: isPlaceholder
           ? []
@@ -53,13 +59,13 @@ resource apps 'Microsoft.App/containerApps@2026-07-01' = [
                     {
                       name: databaseUrlSecret
                       keyVaultUrl: concat(keyVaultUri, 'secrets/', databaseUrlSecret)
-                      identity: 'system'
+                      identity: identityIds[i]
                     }
                   ]
                 : [],
               service.name == 'portal-web' && enableEntraAuth
                 ? [
-                    { name: entraSecret, keyVaultUrl: concat(keyVaultUri, 'secrets/', entraSecret), identity: 'system' }
+                    { name: entraSecret, keyVaultUrl: concat(keyVaultUri, 'secrets/', entraSecret), identity: identityIds[i] }
                   ]
                 : []
             )
@@ -145,6 +151,9 @@ resource portalApp 'Microsoft.App/containerApps@2026-07-01' existing = {
 resource portalAuth 'Microsoft.App/containerApps/authConfigs@2025-01-01' = if (!isPlaceholder && enableEntraAuth) {
   name: 'current'
   parent: portalApp
+  dependsOn: [
+    apps
+  ]
   properties: {
     platform: {
       enabled: true
@@ -166,4 +175,3 @@ resource portalAuth 'Microsoft.App/containerApps/authConfigs@2025-01-01' = if (!
 }
 
 output names array = names
-output principalIds array = [for (service, i) in services: apps[i].identity.principalId]

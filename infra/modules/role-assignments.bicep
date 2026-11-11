@@ -2,6 +2,7 @@ param keyVaultId string
 param registryId string
 param deployerObjectId string
 param appPrincipalIds array
+param secretPrincipalIds array
 
 var secretsOfficerRole = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
@@ -34,7 +35,7 @@ resource deployer 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 }
 
 resource appAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
-  for (principalId, i) in appPrincipalIds: {
+  for principalId in secretPrincipalIds: {
     name: guid(keyVaultId, principalId, 'KeyVaultSecretsUser')
     scope: keyVault
     properties: {

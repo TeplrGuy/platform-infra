@@ -13,6 +13,7 @@ param entraClientSecret string = ''
 param entraClientId string = ''
 param entraTenantId string = subscription().tenantId
 param isPlaceholder bool = true
+param deployApplications bool = false
 param enablePublicIngress bool = false
 param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 param containerImages object = {
@@ -39,6 +40,13 @@ param resourceNames object = {
 
 var rgName = resourceNames.resourceGroup
 var enableEntraAuth = !empty(entraClientId) && !empty(entraClientSecret)
+var appNames = [
+  resourceNames.portal
+  resourceNames.apiGateway
+  resourceNames.orders
+  resourceNames.inventory
+  resourceNames.notifications
+]
 var tags = {
   'app-onboard-skill': 'true'
   'app-onboard-session-id': sessionId
@@ -129,22 +137,47 @@ module environment 'modules/container-environment.bicep' = {
   }
 }
 
-module apps 'modules/container-apps.bicep' = {
+module identities 'modules/managed-identities.bicep' = {
+  scope: rg
+  name: 'application-identities'
+  params: {
+    appNames: appNames
+    location: location
+    tags: tags
+  }
+}
+
+module roleAssignments 'modules/role-assignments.bicep' = {
+  scope: rg
+  name: 'role-assignments'
+  params: {
+    keyVaultId: keyVault.outputs.id
+    registryId: registry.outputs.id
+    deployerObjectId: deployerObjectId
+    appPrincipalIds: identities.outputs.principalIds
+    secretPrincipalIds: [
+      identities.outputs.principalIds[0]
+      identities.outputs.principalIds[2]
+      identities.outputs.principalIds[3]
+      identities.outputs.principalIds[4]
+    ]
+  }
+}
+
+module apps 'modules/container-apps.bicep' = if (deployApplications) {
   scope: rg
   name: 'container-apps'
+  dependsOn: [
+    roleAssignments
+  ]
   params: {
     environmentId: environment.outputs.id
     environmentDefaultDomain: environment.outputs.defaultDomain
     registryLoginServer: registry.outputs.loginServer
     appInsightsConnectionString: appInsights.outputs.connectionString
     keyVaultUri: keyVault.outputs.vaultUri
-    appNames: [
-      resourceNames.portal
-      resourceNames.apiGateway
-      resourceNames.orders
-      resourceNames.inventory
-      resourceNames.notifications
-    ]
+    appNames: appNames
+    identityIds: identities.outputs.ids
     containerImage: containerImage
     containerImages: containerImages
     isPlaceholder: isPlaceholder
@@ -157,18 +190,7 @@ module apps 'modules/container-apps.bicep' = {
   }
 }
 
-module roleAssignments 'modules/role-assignments.bicep' = {
-  scope: rg
-  name: 'role-assignments'
-  params: {
-    keyVaultId: keyVault.outputs.id
-    registryId: registry.outputs.id
-    deployerObjectId: deployerObjectId
-    appPrincipalIds: apps.outputs.principalIds
-  }
-}
-
 output resourceGroupName string = rgName
 output containerRegistryLoginServer string = registry.outputs.loginServer
 output containerAppsEnvironmentId string = environment.outputs.id
-output containerAppNames array = apps.outputs.names
+output containerAppNames array = deployApplications ? apps.outputs.names : []
