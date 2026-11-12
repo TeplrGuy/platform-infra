@@ -59,6 +59,8 @@ on:
           - runtime-recovery
           - private-preview
           - private-apply
+          - public-preview
+          - public-apply
           - health-preview
           - health-apply
           - health-run
@@ -309,7 +311,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js tests/verify-image-artifact.test.js tests/foundation-access-parameters.test.js tests/validate-foundation-access-preview.test.js tests/runtime-preview.test.js tests/private-preview.test.js tests/private-health.test.js tests/health-preview.test.js tests/private-journey.test.js tests/journey-stage.test.js
+      - run: bash -n scripts/public-stage.sh scripts/journey-stage.sh && node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js tests/verify-image-artifact.test.js tests/foundation-access-parameters.test.js tests/validate-foundation-access-preview.test.js tests/runtime-preview.test.js tests/private-preview.test.js tests/private-health.test.js tests/health-preview.test.js tests/private-journey.test.js tests/journey-stage.test.js tests/public-preview.test.js
   quality:
     needs: validate-inputs
     uses: ./.github/workflows/full-stack-e2e.yml
@@ -965,6 +967,107 @@ jobs:
             private-domain.txt
             private-template.sha256
           if-no-files-found: warn
+  preview-public-workloads:
+    if: ${{ inputs.foundation_action == 'public-preview' || inputs.foundation_action == 'public-apply' }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 25
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview the Entra-protected public portal promotion without deploying
+        env:
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+          ENTRA_CLIENT_ID: ${{ vars.ENTRA_CLIENT_ID }}
+          ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
+          ENTRA_REDIRECT_URI: ${{ vars.ENTRA_REDIRECT_URI }}
+        run: bash scripts/public-stage.sh
+      - name: Preserve the redacted public workload preview
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: public-preview-${{ github.run_id }}
+          path: |
+            public-release-audit.log
+            public-what-if.json
+            public-domain.txt
+            public-callback-uri.txt
+            public-url.txt
+            public-template.sha256
+          if-no-files-found: warn
+  apply-public-workloads:
+    if: ${{ inputs.foundation_action == 'public-apply' }}
+    needs: [preview-public-workloads]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 60
+    concurrency:
+      group: agentsdlc-dev-55eb-runtime-apply
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: public-preview-${{ github.run_id }}
+          path: approved-public
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck, promote and verify the Entra-protected public portal
+        env:
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+          ENTRA_CLIENT_ID: ${{ vars.ENTRA_CLIENT_ID }}
+          ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
+          ENTRA_CLIENT_SECRET: ${{ secrets.ENTRA_CLIENT_SECRET }}
+          ENTRA_REDIRECT_URI: ${{ vars.ENTRA_REDIRECT_URI }}
+        run: bash scripts/public-stage.sh apply
+      - name: Preserve redacted public release verification
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: public-apply-${{ github.run_id }}
+          path: |
+            public-release-audit.log
+            public-what-if.json
+            public-domain.txt
+            public-callback-uri.txt
+            public-url.txt
+            public-template.sha256
+            public-live-apps.json
+            health-audit.log
+            health-live.json
+            health-execution.txt
+            journey-audit.log
+            journey-executions.txt
+          if-no-files-found: warn
   preview-private-health:
     if: ${{ inputs.foundation_action == 'health-preview' || inputs.foundation_action == 'health-apply' }}
     needs: [validate-bicep, quality]
@@ -1116,7 +1219,7 @@ jobs:
             journey-executions.txt
           if-no-files-found: warn
   block-unsafe-release:
-    if: ${{ !inputs.bootstrap_rg }}
+    if: ${{ inputs.foundation_action == 'none' && !inputs.bootstrap_rg && !inputs.preview_bootstrap && !inputs.verify_oidc }}
     needs: [validate-bicep, quality]
     runs-on: ubuntu-latest
     permissions: {}
