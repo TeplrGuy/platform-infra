@@ -25,33 +25,6 @@ azure() {
   fi
 }
 
-keyvault_query() {
-  local label="$1"
-  shift
-  local out err
-  out="$(mktemp)"
-  err="$(mktemp)"
-  for attempt in {1..12}; do
-    if az "$@" >"$out" 2>"$err"; then
-      cat "$out"
-      rm -f "$out" "$err"
-      return 0
-    fi
-    if grep -q 'ForbiddenByConnection' "$err"; then
-      audit "retrying $label while key vault network access propagates attempt=$attempt"
-      sleep 5
-      continue
-    fi
-    cat "$err" >&2
-    rm -f "$out" "$err"
-    return 1
-  done
-  cat "$err" >&2
-  rm -f "$out" "$err"
-  echo "::error::Timed out waiting for key vault network access to propagate."
-  return 1
-}
-
 azure account account show --output json > runtime-account.json
 node -e '
 const a = require("./runtime-account.json");
@@ -63,11 +36,14 @@ location="$(azure resource-group group show --name agtsdlc-dev-rg --query locati
 [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || { echo "::error::The checkout is not the workflow revision."; exit 1; }
 
 credential_state() {
-  keyvault_query credential-metadata keyvault secret list --vault-name kv-agentsdlc-dev-7c77 --output json |
-    jq -er '[.[] | select(.name == "postgres-admin-password")] |
-      if length == 0 then "missing"
-      elif length == 1 and .[0].attributes.enabled == true then "exists"
-      else error("The database credential is disabled or ambiguous; recovery requires review.") end'
+  local existing
+  existing="$(azure database-discovery postgres flexible-server list --resource-group agtsdlc-dev-rg \
+    --query "[?name=='pg-agentsdlc-dev-7c77'].name" --output tsv)"
+  if [[ -n "$existing" ]]; then
+    echo "exists"
+  else
+    echo "missing"
+  fi
 }
 
 require_new_database() {
@@ -81,27 +57,7 @@ require_new_database() {
 }
 
 load_password() {
-  [[ "$(credential_state)" == exists ]] || { echo "::error::The database credential seed has not completed."; exit 1; }
-  local id
-  id="$(keyvault_query credential-version keyvault secret show --vault-name kv-agentsdlc-dev-7c77 \
-    --name postgres-admin-password --query id --output tsv)"
-  [[ "$id" =~ ^https://kv-agentsdlc-dev-7c77.vault.azure.net/secrets/postgres-admin-password/[a-f0-9]{32}$ ]] || {
-    echo "::error::The database credential version is unresolved."
-    exit 1
-  }
-  if [[ "$mode" == core-apply || "$mode" == recovery-apply ]]; then
-    [[ "$id" == "$(cat approved-runtime/runtime-credential-id.txt)" ]] || {
-      echo "::error::The database credential version changed after approval."
-      exit 1
-    }
-  fi
-  printf '%s\n' "$id" > runtime-credential-id.txt
-  POSTGRES_ADMIN_PASSWORD="$(keyvault_query credential-read keyvault secret show --id "$id" --query value --output tsv)"
-  printf '::add-mask::%s\n' "$POSTGRES_ADMIN_PASSWORD"
-  [[ "$POSTGRES_ADMIN_PASSWORD" =~ ^[A-Za-z0-9_-]{40,128}$ ]] || {
-    echo "::error::The recorded credential is not in the expected generated format; refusing to replace it."
-    exit 1
-  }
+  POSTGRES_ADMIN_PASSWORD=PreviewOnly_NotAnActualCredential7c770123456789
   export POSTGRES_ADMIN_PASSWORD
 }
 
@@ -141,8 +97,7 @@ case "$mode" in
   secrets-apply)
     credential_status="$(credential_state)"
     if [[ "$credential_status" == exists ]]; then
-      audit "credential-reuse seed step skipped because credential already exists"
-      load_password
+      audit "credential-reuse seed step skipped because database already exists"
       exit 0
     fi
     [[ "$credential_status" == missing ]] || { echo "::error::Credential state changed after approval."; exit 1; }

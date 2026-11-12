@@ -686,13 +686,6 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Enable Key Vault public access for runtime credential validation
-        run: |
-          az keyvault update \
-            --name kv-agentsdlc-dev-7c77 \
-            --resource-group agtsdlc-dev-rg \
-            --public-network-access Enabled \
-            --only-show-errors --output none
       - id: preview
         name: Preview the one-time credential seed or verify reuse
         run: bash scripts/runtime-stage.sh secrets-preview
@@ -705,14 +698,6 @@ jobs:
       - name: Recheck and persist the administrator credential through IaC
         if: ${{ steps.preview.outputs.seed_required == 'true' }}
         run: bash scripts/runtime-stage.sh secrets-apply
-      - name: Restore Key Vault private-only access
-        if: always()
-        run: |
-          az keyvault update \
-            --name kv-agentsdlc-dev-7c77 \
-            --resource-group agtsdlc-dev-rg \
-            --public-network-access Disabled \
-            --only-show-errors --output none
       - name: Preserve redacted credential preview
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -742,23 +727,8 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Enable Key Vault public access for runtime preview
-        run: |
-          az keyvault update \
-            --name kv-agentsdlc-dev-7c77 \
-            --resource-group agtsdlc-dev-rg \
-            --public-network-access Enabled \
-            --only-show-errors --output none
       - name: Preview only PostgreSQL, telemetry and the private runtime environment
         run: bash scripts/runtime-stage.sh core-preview
-      - name: Restore Key Vault private-only access
-        if: always()
-        run: |
-          az keyvault update \
-            --name kv-agentsdlc-dev-7c77 \
-            --resource-group agtsdlc-dev-rg \
-            --public-network-access Disabled \
-            --only-show-errors --output none
       - name: Preserve the redacted runtime preview
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -768,7 +738,6 @@ jobs:
             runtime-audit.log
             runtime-what-if.json
             runtime-template.sha256
-            runtime-credential-id.txt
           if-no-files-found: warn
   apply-runtime:
     if: ${{ always() && !cancelled() && inputs.foundation_action == 'runtime-apply' && needs.preview-runtime.result == 'success' }}
@@ -797,23 +766,8 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Enable Key Vault public access for runtime apply
-        run: |
-          az keyvault update \
-            --name kv-agentsdlc-dev-7c77 \
-            --resource-group agtsdlc-dev-rg \
-            --public-network-access Enabled \
-            --only-show-errors --output none
       - name: Recheck the approved preview and deploy runtime prerequisites
         run: bash scripts/runtime-stage.sh core-apply
-      - name: Restore Key Vault private-only access
-        if: always()
-        run: |
-          az keyvault update \
-            --name kv-agentsdlc-dev-7c77 \
-            --resource-group agtsdlc-dev-rg \
-            --public-network-access Disabled \
-            --only-show-errors --output none
       - name: Preserve runtime deployment evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -823,7 +777,6 @@ jobs:
             runtime-audit.log
             runtime-what-if.json
             runtime-template.sha256
-            runtime-credential-id.txt
             runtime-outputs.json
           if-no-files-found: warn
   preview-runtime-recovery:
@@ -856,7 +809,6 @@ jobs:
             runtime-audit.log
             runtime-what-if.json
             runtime-template.sha256
-            runtime-credential-id.txt
           if-no-files-found: warn
   apply-runtime-recovery:
     if: ${{ inputs.foundation_action == 'runtime-recovery' }}
@@ -896,7 +848,6 @@ jobs:
             runtime-audit.log
             runtime-what-if.json
             runtime-template.sha256
-            runtime-credential-id.txt
           if-no-files-found: warn
   preview-private-workloads:
     if: ${{ inputs.foundation_action == 'private-preview' || inputs.foundation_action == 'private-apply' }}
