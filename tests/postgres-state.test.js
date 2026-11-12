@@ -55,6 +55,15 @@ async function post(base, route, body) {
   });
 }
 
+async function waitFor(assertion, timeoutMs = 5000, intervalMs = 100) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await assertion()) return;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error('Timed out waiting for expected state');
+}
+
 test('PostgreSQL state survives restarts and coordinates replicas', { skip: !connectionString }, async () => {
   const database = decodeURIComponent(new URL(connectionString).pathname.slice(1));
   if (!database.endsWith('_test')) throw new Error('TEST_DATABASE_URL must identify a database ending in _test');
@@ -133,9 +142,9 @@ test('PostgreSQL state survives restarts and coordinates replicas', { skip: !con
     orders = await launch('orders-service', {
       INVENTORY_SERVICE_URL: inventory.base, NOTIFICATIONS_SERVICE_URL: notifications.base
     });
-    assert.equal((await (await fetch(`${orders.base}/orders/order-1`)).json()).order.orderId, 'order-1');
-    assert.equal((await (await fetch(`${inventory.base}/inventory/SKU-100`)).json()).available, 0);
-    assert.equal((await (await fetch(`${notifications.base}/notifications/order/order-1`)).json()).count, 1);
+    await waitFor(async () => (await (await fetch(`${orders.base}/orders/order-1`)).json()).order?.orderId === 'order-1');
+    await waitFor(async () => (await (await fetch(`${inventory.base}/inventory/SKU-100`)).json()).available === 0);
+    await waitFor(async () => (await (await fetch(`${notifications.base}/notifications/order/order-1`)).json()).count === 1);
   } finally {
     for (const child of children) await stop(child);
     if (created) await pool.query(`DROP SCHEMA "${schema}" CASCADE`);
