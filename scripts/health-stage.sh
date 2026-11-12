@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+mode="${1:-preview}"
+[[ "$mode" == preview || "$mode" == apply ]] || { echo "::error::Unknown health job stage."; exit 1; }
 if [[ "${GITHUB_ACTIONS:-}" != true || "${GITHUB_REPOSITORY:-}" != TeplrGuy/platform-infra ||
       "${GITHUB_EVENT_NAME:-}" != workflow_dispatch ]]; then
   echo "::error::Private health preview requires the protected GitHub Actions workflow."
@@ -44,3 +46,31 @@ printf '%s\n' "$domain" > health-domain.txt
 git ls-files -z infra scripts/private-health.js scripts/health-preview.js scripts/health-stage.sh scripts/runtime-preview.js |
   xargs -0 sha256sum > health-template.sha256
 sha256sum health-compiled.json >> health-template.sha256
+if [[ "$mode" == apply ]]; then
+  cmp -s health-domain.txt approved-health/health-domain.txt ||
+    { echo "::error::Health environment domain changed after approval."; exit 1; }
+  sha256sum --check approved-health/health-template.sha256
+  node scripts/health-preview.js health-what-if.json "$domain" approved-health/health-what-if.json
+  deployment="health-job-$GITHUB_RUN_ID"
+  audit "started health-apply deployment=$deployment"
+  if ! state="$(az deployment group create --name "$deployment" --resource-group agtsdlc-dev-rg \
+    --template-file health-compiled.json --mode Incremental \
+    --query properties.provisioningState --output tsv 2>health-apply-error.txt)"; then
+    audit "failed health-apply deployment=$deployment; inspect Azure deployment operations"
+    echo "::error::Private health job deployment failed; inspect Azure deployment operations."
+    exit 1
+  fi
+  [[ "$state" == Succeeded ]] || { echo "::error::Private health job deployment did not succeed."; exit 1; }
+  azure health-readback resource show --ids "$scope/Microsoft.App/jobs/job-agentsdlc-dev-55eb-health" \
+    --api-version 2026-07-01 --output json |
+    node scripts/runtime-preview.js sanitize > health-live.json
+  node -e '
+    const fs = require("node:fs");
+    const job = JSON.parse(fs.readFileSync("health-live.json", "utf8"));
+    if (job.properties?.provisioningState !== "Succeeded") throw Error("The health job is not provisioned.");
+    require("./scripts/health-preview").validate(
+      {status:"Succeeded", changes:[{changeType:"Create", resourceId:job.id, after:job}]},
+      process.argv[1], fs.readFileSync("scripts/private-health.js", "utf8"));
+  ' "$domain"
+  audit "health job deployed and validated; execution has not started"
+fi

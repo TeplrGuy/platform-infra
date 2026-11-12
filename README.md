@@ -146,6 +146,9 @@ and protected public promotion remain required.
 `foundation_action: health-preview` previews a separate manual, read-only
 Container Apps Job for checking private service health from within the same
 environment. Preview alone neither creates nor runs the job.
+`foundation_action: health-apply` uses a separate protected approval and
+matching recheck to create the job, then validates its Azure readback. It does
+not start the job or prove application health.
 The test, production, and rollback workflows remain blocked and must be
 adapted to resource-group-scope deployment and verified before enabling them.
 `infra/rg-rbac-condition.txt` is a proposed Azure RBAC condition for scoped
