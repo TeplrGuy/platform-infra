@@ -78,26 +78,27 @@ dispatched. It is not currently a required PR check or a deployment approval.
 
 ## Deployment status
 
-The dev release workflow is intentionally blocked and performs no deployment.
-It requires five full commit SHAs and runs Bicep and application quality gates
-before the block. Azure provisioning and releases must use GitHub Actions, not
-local or portal commands. Before the block can be removed, implement and verify
-OIDC and least-privilege RBAC, Bicep what-if, immutable image promotion, secret
-reuse, a `dev` environment approval, and live health checks. Building images in
-the quality gate does not publish or promote them. A future release job must
-serialize deployments without canceling pending or running work.
-Public portal ingress defaults to disabled. A future staged release must first
-create the portal internally, configure and verify Entra authentication, then
-explicitly enable public ingress through the protected deployment pipeline.
+The dev workflow now has separate preview/apply actions for private workloads
+and an Entra-protected public portal. These actions have not been run from this
+working branch and do not imply that a release is currently deployed. Azure
+provisioning and releases must use GitHub Actions, not local or portal commands.
+The actions require the approved OIDC identity, matching pinned image
+provenance, a protected `dev` environment approval for apply, and
+post-deployment verification. Building images in the quality gate does not
+publish or promote them. Apply jobs serialize deployments without canceling
+pending or running work.
+Public portal ingress defaults to disabled. The staged public action explicitly
+enables ingress only for the portal and configures built-in Entra authentication
+before reporting the public URL.
 Service-to-service URLs use HTTPS and the internal Container Apps hostname
 format (`<app>.internal.<environment-domain>`). These endpoints are reachable
 only from apps in the same environment, so live backend probes must run there,
 not directly on a public GitHub-hosted runner. See
 [Container Apps service discovery](https://learn.microsoft.com/azure/container-apps/connect-apps).
 Application identities and registry/Key Vault role assignments are created
-before the apps. Application creation defaults off via `deployApplications`,
-so a future pipeline can publish images and wait for RBAC propagation before
-creating application revisions. This parameter is not a release pipeline.
+before the apps. Application creation defaults off via `deployApplications`;
+the staged publisher and workload actions use those existing assignments.
+This parameter is not itself a release pipeline.
 `infra/foundation.bicep` contains the registry, vault, application identities,
 and deployer access without creating application or database resources. Its
 first-stage preview omits application role assignments, whose principal IDs
@@ -120,7 +121,7 @@ environment-backed `.bicepparam` files and are excluded from stored previews.
 After quality gates, a second preview/approval/recheck deploys only the planned
 North Europe PostgreSQL, telemetry and Container Apps environment. It creates
 no application workloads, role grants or Entra registration. New runtime apply
-jobs use a non-canceling FIFO queue. The final application-release block remains.
+jobs use a non-canceling FIFO queue.
 For the partial runtime deployment in run 43175062572, `runtime-recovery`
 previews and applies only the PostgreSQL extension setting and a new database
 URL secret. It checks that the existing server is ready with the expected
@@ -141,8 +142,20 @@ protected `dev` approval, then checks the template, parameters and a fresh what-
 against the approved preview before applying only the five private workloads.
 This initial create-only path fails closed if applications already exist; recovery
 requires a separate reviewed path. It does not establish application health or
-enable public access. In-environment functional and durability checks, Entra sign-in,
-and protected public promotion remain required.
+enable public access.
+`foundation_action: public-preview` is read-only and validates the exact pinned
+image digests, North Europe target, portal-only public ingress, Entra auth
+configuration, and redacted Key Vault secret scope. `public-apply` repeats the
+preview in a separate `dev` environment job, compares it with the approved
+artifact, then applies the Entra configuration and public portal ingress.
+It reads back all five app images and ingress settings, checks the portal
+callback URL, requires anonymous requests to redirect to the configured Entra
+tenant/client, then runs the in-environment health and scale-to-zero durability
+journey. The workflow reports the portal URL only after those checks pass.
+Public promotion refuses input refs that differ from `infra/private-release.json`;
+updating that manifest requires an independently reviewed, immutable publisher
+record. A newer feature PR is not deployable merely because its source SHA was
+supplied to workflow dispatch.
 `foundation_action: health-preview` previews a separate manual, read-only
 Container Apps Job for checking private service health from within the same
 environment. Preview alone neither creates nor runs the job.
@@ -161,7 +174,8 @@ condition at the demo resource group; functional enforcement still needs to be
 verified through the pipeline.
 The optional `verify_oidc` dispatch input runs a separate, human-approved
 sign-in check against the protected `dev` environment. It grants no RBAC and
-does not deploy resources; the release remains blocked even if it succeeds.
+does not deploy resources; run the corresponding preview/apply action for a
+workload change.
 The optional `preview_bootstrap` input runs a read-only ARM what-if for the
 resource group and saves its result and audit log. Its bootstrap role can create
 or update resource groups throughout the subscription because Azure requires
@@ -169,7 +183,7 @@ subscription scope to create a resource group; it grants no access to workload
 resources or role assignments. Remove this temporary role after bootstrapping.
 The separate `bootstrap_rg` input previews and, after a second protected
 approval and a matching recheck, creates only the approved resource group. It
-does not deploy the application or remove the application release block.
+does not deploy the application.
 
 ## GitHub OIDC variables required
 
@@ -183,12 +197,19 @@ The `dev` environment requires an approved human reviewer and disables admin
 bypass. Self-review is allowed because TeplrGuy is the only available reviewer;
 this is not independent review. Configure and verify appropriate protection for
 `test` and `prod` before enabling those releases.
+The public portal workflow requires `ENTRA_CLIENT_ID` and `ENTRA_TENANT_ID` as
+`dev` environment variables. Before `public-apply`, set the exact callback
+`ENTRA_REDIRECT_URI` as a `dev` environment variable and `ENTRA_CLIENT_SECRET`
+as a protected `dev` environment secret. Register the callback URI printed by
+the public preview for the web application. Never place the secret in a
+repository file or workflow artifact. The public action is available only after
+this workflow change is reviewed and merged to the default branch.
 
 ## Customer walkthrough (day-in-the-life)
 
 1. Start with a GitHub issue and acceptance criteria in one of the service repos.
 2. Implement in a short-lived branch, open a PR, and link the issue.
 3. Use PR checklist + CODEOWNERS + `ci` + `security` workflows as merge gates.
-4. Deployment workflows are deliberately blocked: the templates still use placeholder application images. Implement and verify immutable releases before enabling them.
-5. Rollback is deliberately blocked: redeploying a Git ref does not restore a verified application image. Establish image-based rollback before enabling it.
+4. For a live demo, use only a reviewed immutable release through the staged private and public `dev` actions; the public portal requires Entra sign-in and its URL is reported only after health and durability checks pass.
+5. Test, production, and rollback releases remain blocked until their resource scopes and verified image rollback paths are independently implemented.
 6. Use `portal-web` to demonstrate the visible customer flow and link the runtime behavior back to GitHub issues, PRs, and workflows.

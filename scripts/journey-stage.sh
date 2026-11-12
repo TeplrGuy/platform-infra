@@ -30,10 +30,11 @@ const [key, json] = process.argv.slice(2);
 const app = JSON.parse(json);
 const names = { portal: 'portal', apigw: 'apiGateway', orders: 'orders', inventory: 'inventory', notify: 'notifications' };
 const service = release.services.find(item => item.key === names[key]);
+const expectPublicPortal = key === 'portal' && process.env.PUBLIC_PORTAL_EXPECTED === 'true';
 if (!service || process.env[service.refEnv] !== service.revision ||
     app.image !== `cragentsdlcdev55eb.azurecr.io/${service.name}@${service.digest}` ||
-    app.external !== false || app.state !== 'Succeeded') {
-  throw Error(`Pinned private application validation failed: ${key}`);
+    app.external !== expectPublicPortal || app.state !== 'Succeeded') {
+  throw Error(`Pinned application validation failed: ${key}`);
 }
 NODE
   done
