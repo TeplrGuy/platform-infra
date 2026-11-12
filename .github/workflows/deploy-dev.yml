@@ -487,7 +487,7 @@ jobs:
   publish-images:
     if: ${{ inputs.foundation_action == 'publish-images' && inputs.preserve_images && !inputs.bootstrap_rg }}
     needs: [validate-bicep, quality]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: dev
     timeout-minutes: 30
     permissions:
