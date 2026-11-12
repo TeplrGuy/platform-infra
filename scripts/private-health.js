@@ -1,9 +1,9 @@
 const names = [
-  ['portal-web', 'ca-agentsdlc-dev-55eb-portal'],
-  ['api-gateway', 'ca-agentsdlc-dev-55eb-apigw'],
-  ['orders-service', 'ca-agentsdlc-dev-55eb-orders'],
-  ['inventory-service', 'ca-agentsdlc-dev-55eb-inventory'],
-  ['notifications-service', 'ca-agentsdlc-dev-55eb-notify']
+  ['portal-web', 'ca-agentsdlc-dev-7c77-portal'],
+  ['api-gateway', 'ca-agentsdlc-dev-7c77-apigw'],
+  ['orders-service', 'ca-agentsdlc-dev-7c77-orders'],
+  ['inventory-service', 'ca-agentsdlc-dev-7c77-inventory'],
+  ['notifications-service', 'ca-agentsdlc-dev-7c77-notify']
 ];
 
 async function check(domain, request = fetch, sleep = ms => new Promise(resolve => setTimeout(resolve, ms))) {

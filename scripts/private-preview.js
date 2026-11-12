@@ -5,11 +5,11 @@ const release = require('../infra/private-release.json');
 const foundation = require('../infra/foundation.parameters.json').parameters;
 
 const root = '/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/';
-const registry = 'cragentsdlcdev55eb.azurecr.io';
-const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb`;
-const vaultSecret = 'https://kv-agentsdlc-dev-55eb.vault.azure.net/secrets/postgres-database-url';
-const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb`;
-const registryId = `${root}Microsoft.ContainerRegistry/registries/cragentsdlcdev55eb`;
+const registry = 'cragentsdlcdev7c77.azurecr.io';
+const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77`;
+const vaultSecret = 'https://kv-agentsdlc-dev-7c77.vault.azure.net/secrets/postgres-database-url';
+const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
+const registryId = `${root}Microsoft.ContainerRegistry/registries/cragentsdlcdev7c77`;
 
 function validateTemplate(template) {
   const modules = Object.values(template?.resources || {});
@@ -25,7 +25,7 @@ function validateTemplate(template) {
       params.appInsightsConnectionString?.value !== "[reference(resourceId('Microsoft.Insights/components', variables('names').appInsights), '2020-02-02').ConnectionString]" ||
       template.variables?.names !== "[variables('$fxv#0').parameters.resourceNames.value]" ||
       !isDeepStrictEqual(template.variables?.['$fxv#0']?.parameters?.resourceNames?.value, resourceNames) ||
-      resourceNames.appInsights !== 'appi-agentsdlc-dev-55eb' ||
+      resourceNames.appInsights !== 'appi-agentsdlc-dev-7c77' ||
       nested.variables?.databaseUrlSecret !== 'postgres-database-url' ||
       hash(apps.properties?.configuration?.secrets) !== '0d83a39080e111b8a1a26b4a0bdba68e913c875d6b02c8cea52d7bfb479e5490' ||
       hash(apps.properties?.template?.containers?.[0]?.env) !== '1668e956400eaf480d7c736d54f138b04d59d5ee41e63a2e4d4cb0f31f741747') {
@@ -94,7 +94,7 @@ function validate(preview, domain, refs, template) {
     }
     const vars = new Map((containers[0].env || []).map(item => [item.name, item]));
     if (vars.size !== (containers[0].env || []).length || vars.get('PORT')?.value !== '3000' ||
-        vars.get('ENVIRONMENT_NAME')?.value !== 'agentsdlc-dev-55eb' ||
+        vars.get('ENVIRONMENT_NAME')?.value !== 'agentsdlc-dev-7c77' ||
         vars.get('APPLICATIONINSIGHTS_CONNECTION_STRING')?.value !== '[REDACTED]' ||
         vars.get('OTEL_SERVICE_NAME')?.value !== release.services[i].name) {
       throw Error('Required application environment or telemetry is invalid.');

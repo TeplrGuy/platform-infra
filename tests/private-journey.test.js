@@ -17,7 +17,7 @@ function fixture(options = {}) {
     if (url.endsWith('/health')) {
       const match = [['portal', 'portal-web'], ['apigw', 'api-gateway'], ['orders', 'orders-service'],
         ['inventory', 'inventory-service'], ['notify', 'notifications-service']]
-        .find(([name]) => url.includes(`-55eb-${name}.`));
+        .find(([name]) => url.includes(`-7c77-${name}.`));
       return json(200, { service: match[1], status: 'ok' });
     }
     if (init.method === 'POST') {

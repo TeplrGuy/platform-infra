@@ -13,8 +13,8 @@ const root = '/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups
 const domain = 'example-1234.northeurope.azurecontainerapps.io';
 const source = readFileSync('scripts/private-health.js', 'utf8');
 const identity = `${root}Microsoft.ManagedIdentity/userAssignedIdentities/${foundation.appNames.value[0]}-identity`;
-const id = `${root}Microsoft.App/jobs/job-agentsdlc-dev-55eb-health`;
-const envId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb`;
+const id = `${root}Microsoft.App/jobs/job-agentsdlc-dev-7c77-health`;
+const envId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77`;
 
 function preview() {
   return { status: 'Succeeded', changes: [{ changeType: 'Create', resourceId: id, after: {
@@ -24,9 +24,9 @@ function preview() {
       environmentId: envId,
       configuration: { triggerType: 'Manual', replicaRetryLimit: 0, replicaTimeout: 600,
         manualTriggerConfig: { parallelism: 1, replicaCompletionCount: 1 },
-        registries: [{ identity, server: 'cragentsdlcdev55eb.azurecr.io' }] },
+        registries: [{ identity, server: 'cragentsdlcdev7c77.azurecr.io' }] },
       template: { containers: [{
-        name: 'private-health', image: `cragentsdlcdev55eb.azurecr.io/${release.services[0].name}@${release.services[0].digest}`,
+        name: 'private-health', image: `cragentsdlcdev7c77.azurecr.io/${release.services[0].name}@${release.services[0].digest}`,
         command: ['node', '-e', source], resources: { cpu: 0.5, memory: '1Gi' },
         env: [{ name: 'PRIVATE_HEALTH_RUN', value: 'true' }, { name: 'ACA_DOMAIN', value: domain }]
       }] }
@@ -88,7 +88,7 @@ case "$1 $2 $3" in
   'bicep build --file') echo '{}' ;;
   'deployment group what-if') cat "$TEST_PREVIEW" ;;
   'deployment group create') touch "$TEST_WRITTEN"; echo Succeeded ;;
-  'containerapp job start') touch "$TEST_STARTED"; echo job-agentsdlc-dev-55eb-health-ab123 ;;
+  'containerapp job start') touch "$TEST_STARTED"; echo job-agentsdlc-dev-7c77-health-ab123 ;;
   'containerapp job execution') echo "\${TEST_STATUS:-Succeeded}" ;;
   *) echo "Unexpected Azure command" >&2; exit 1 ;;
 esac

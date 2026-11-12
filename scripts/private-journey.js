@@ -11,7 +11,7 @@ async function journey(domain, orderId, mode, request = fetch, sleep = ms => new
       !/^demo-[0-9]+$/.test(orderId) || !['create', 'verify'].includes(mode)) {
     throw Error('Invalid journey parameters.');
   }
-  const url = name => `https://ca-agentsdlc-dev-55eb-${name}.internal.${domain}`;
+  const url = name => `https://ca-agentsdlc-dev-7c77-${name}.internal.${domain}`;
   const get = async target => {
     const response = await request(target, { signal: AbortSignal.timeout(20000) });
     const body = await response.json();

@@ -14,11 +14,11 @@ var release = loadJsonContent('private-release.json')
 var appNames = foundation.appNames.value
 var identityIds = [for name in appNames: resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', '${name}-identity')]
 var containerImages = {
-  portal: 'cragentsdlcdev55eb.azurecr.io/${release.services[0].name}@${release.services[0].digest}'
-  apiGateway: 'cragentsdlcdev55eb.azurecr.io/${release.services[1].name}@${release.services[1].digest}'
-  orders: 'cragentsdlcdev55eb.azurecr.io/${release.services[2].name}@${release.services[2].digest}'
-  inventory: 'cragentsdlcdev55eb.azurecr.io/${release.services[3].name}@${release.services[3].digest}'
-  notifications: 'cragentsdlcdev55eb.azurecr.io/${release.services[4].name}@${release.services[4].digest}'
+  portal: 'cragentsdlcdev7c77.azurecr.io/${release.services[0].name}@${release.services[0].digest}'
+  apiGateway: 'cragentsdlcdev7c77.azurecr.io/${release.services[1].name}@${release.services[1].digest}'
+  orders: 'cragentsdlcdev7c77.azurecr.io/${release.services[2].name}@${release.services[2].digest}'
+  inventory: 'cragentsdlcdev7c77.azurecr.io/${release.services[3].name}@${release.services[3].digest}'
+  notifications: 'cragentsdlcdev7c77.azurecr.io/${release.services[4].name}@${release.services[4].digest}'
 }
 
 resource environment 'Microsoft.App/managedEnvironments@2026-07-01' existing = {

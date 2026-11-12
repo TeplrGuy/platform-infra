@@ -7,7 +7,7 @@ bash scripts/health-stage.sh verify
 domain="$(cat health-domain.txt)"
 order="demo-$GITHUB_RUN_ID"
 scope="/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers"
-job="$scope/Microsoft.App/jobs/job-agentsdlc-dev-55eb-health"
+job="$scope/Microsoft.App/jobs/job-agentsdlc-dev-7c77-health"
 audit() { printf '%s run=%s commit=%s\n' "$*" "$GITHUB_RUN_ID" "$GITHUB_SHA" | tee -a journey-audit.log >&2; }
 azure() {
   local label="$1"; shift
@@ -21,7 +21,7 @@ azure() {
 check_apps() {
   local key actual
   for key in portal apigw orders inventory notify; do
-    actual="$(azure "app-$key" containerapp show --name "ca-agentsdlc-dev-55eb-$key" \
+    actual="$(azure "app-$key" containerapp show --name "ca-agentsdlc-dev-7c77-$key" \
       --resource-group agtsdlc-dev-rg \
       --query '{image:properties.template.containers[0].image,external:properties.configuration.ingress.external,state:properties.provisioningState}' --output json)"
     node - "$key" "$actual" <<'NODE'
@@ -32,7 +32,7 @@ const names = { portal: 'portal', apigw: 'apiGateway', orders: 'orders', invento
 const service = release.services.find(item => item.key === names[key]);
 const expectPublicPortal = key === 'portal' && process.env.PUBLIC_PORTAL_EXPECTED === 'true';
 if (!service || process.env[service.refEnv] !== service.revision ||
-    app.image !== `cragentsdlcdev55eb.azurecr.io/${service.name}@${service.digest}` ||
+    app.image !== `cragentsdlcdev7c77.azurecr.io/${service.name}@${service.digest}` ||
     app.external !== expectPublicPortal || app.state !== 'Succeeded') {
   throw Error(`Pinned application validation failed: ${key}`);
 }
@@ -62,11 +62,11 @@ NODE
   execution="$(azure "journey-start-$mode" rest --method post \
     --url "https://management.azure.com$job/start?api-version=2026-01-01" \
     --headers 'Content-Type=application/json' --body @journey-request.json --query name --output tsv)"
-  [[ "$execution" =~ ^job-agentsdlc-dev-55eb-health-[a-z0-9]+$ ]] ||
+  [[ "$execution" =~ ^job-agentsdlc-dev-7c77-health-[a-z0-9]+$ ]] ||
     { echo "::error::Unexpected journey execution ID; reconcile before retrying."; exit 1; }
   printf '%s %s %s\n' "$mode" "$order" "$execution" | tee -a journey-executions.txt
   for ((attempt=0; attempt<72; attempt++)); do
-    status="$(azure "journey-status-$mode" containerapp job execution show --name job-agentsdlc-dev-55eb-health \
+    status="$(azure "journey-status-$mode" containerapp job execution show --name job-agentsdlc-dev-7c77-health \
       --resource-group agtsdlc-dev-rg --job-execution-name "$execution" --query properties.status --output tsv)"
     case "$status" in
       Succeeded) audit "journey execution succeeded mode=$mode order=$order execution=$execution"; return 0 ;;
@@ -80,17 +80,17 @@ NODE
 }
 
 check_apps
-revision="$(azure order-revision containerapp show --name ca-agentsdlc-dev-55eb-orders \
+revision="$(azure order-revision containerapp show --name ca-agentsdlc-dev-7c77-orders \
   --resource-group agtsdlc-dev-rg --query properties.latestReadyRevisionName --output tsv)"
-[[ "$revision" =~ ^ca-agentsdlc-dev-55eb-orders--[a-z0-9]+$ ]] ||
+[[ "$revision" =~ ^ca-agentsdlc-dev-7c77-orders--[a-z0-9]+$ ]] ||
   { echo "::error::Unexpected orders revision."; exit 1; }
 run_journey create
 seen_running=false
 for ((attempt=0; attempt<60; attempt++)); do
-  current="$(azure order-revision containerapp show --name ca-agentsdlc-dev-55eb-orders \
+  current="$(azure order-revision containerapp show --name ca-agentsdlc-dev-7c77-orders \
     --resource-group agtsdlc-dev-rg --query properties.latestReadyRevisionName --output tsv)"
   [[ "$current" == "$revision" ]] || { echo "::error::Orders revision changed during durability check."; exit 1; }
-  replicas="$(azure order-replicas containerapp replica list --name ca-agentsdlc-dev-55eb-orders \
+  replicas="$(azure order-replicas containerapp replica list --name ca-agentsdlc-dev-7c77-orders \
     --resource-group agtsdlc-dev-rg --revision "$revision" --output json)"
   state="$(node -e '
     const r = JSON.parse(process.argv[1]);

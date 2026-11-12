@@ -3,11 +3,11 @@ const { isDeepStrictEqual } = require('node:util');
 
 const expectedId = '/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg';
 const expectedTags = {
-  'app-onboard-session-id': '55eb0364-fed8-4fc9-95e3-405ad428b06d',
+  'app-onboard-session-id': '7c770364-fed8-4fc9-95e3-405ad428b06d',
   'app-onboard-skill': 'true',
   'created-at': '2026-11-11T15:43:42.2240991-05:00',
   'deployed-by': 'github-actions',
-  environment: 'agentsdlc-dev-55eb'
+  environment: 'agentsdlc-dev-7c77'
 };
 
 function validate(preview) {

@@ -4,10 +4,10 @@ const foundation = require('../infra/foundation.parameters.json').parameters;
 const release = require('../infra/private-release.json');
 
 const root = '/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/';
-const jobId = `${root}Microsoft.App/jobs/job-agentsdlc-dev-55eb-health`;
-const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb`;
+const jobId = `${root}Microsoft.App/jobs/job-agentsdlc-dev-7c77-health`;
+const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77`;
 const identityId = `${root}Microsoft.ManagedIdentity/userAssignedIdentities/${foundation.appNames.value[0]}-identity`;
-const image = `cragentsdlcdev55eb.azurecr.io/${release.services[0].name}@${release.services[0].digest}`;
+const image = `cragentsdlcdev7c77.azurecr.io/${release.services[0].name}@${release.services[0].digest}`;
 
 function validate(preview, domain, source) {
   if (!/^[a-z0-9-]+\.northeurope\.azurecontainerapps\.io$/.test(domain) ||
@@ -34,7 +34,7 @@ function validate(preview, domain, source) {
   const config = job.properties.configuration;
   if (config?.triggerType !== 'Manual' || config.replicaRetryLimit !== 0 || config.replicaTimeout !== 600 ||
       config.manualTriggerConfig?.parallelism !== 1 || config.manualTriggerConfig.replicaCompletionCount !== 1 ||
-      config.registries?.length !== 1 || config.registries[0].server !== 'cragentsdlcdev55eb.azurecr.io' ||
+      config.registries?.length !== 1 || config.registries[0].server !== 'cragentsdlcdev7c77.azurecr.io' ||
       config.registries[0].identity?.toLowerCase() !== identityId.toLowerCase() ||
       (config.secrets || []).length) throw Error('Health job execution configuration changed.');
   const containers = job.properties.template?.containers;

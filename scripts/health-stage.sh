@@ -33,13 +33,13 @@ azure account account show --output json |
 scope="/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers"
 location="$(azure resource-group group show --name agtsdlc-dev-rg --query location --output tsv)"
 [[ "$location" == northeurope ]] || { echo "::error::Resource group location changed."; exit 1; }
-environment="$(azure environment resource show --ids "$scope/Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb" \
+environment="$(azure environment resource show --ids "$scope/Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77" \
   --api-version 2026-07-01 --query '{state:properties.provisioningState,domain:properties.defaultDomain}' --output json)"
 [[ "$(jq -r '.state' <<< "$environment")" == Succeeded ]] || { echo "::error::Runtime environment is not ready."; exit 1; }
 domain="$(jq -er '.domain' <<< "$environment")"
 
 readback() {
-  azure health-readback resource show --ids "$scope/Microsoft.App/jobs/job-agentsdlc-dev-55eb-health" \
+  azure health-readback resource show --ids "$scope/Microsoft.App/jobs/job-agentsdlc-dev-7c77-health" \
     --api-version 2026-07-01 --output json |
     node scripts/runtime-preview.js sanitize > health-live.json
   node -e '
@@ -60,13 +60,13 @@ fi
 
 if [[ "$mode" == run ]]; then
   readback
-  execution="$(azure health-start containerapp job start --name job-agentsdlc-dev-55eb-health \
+  execution="$(azure health-start containerapp job start --name job-agentsdlc-dev-7c77-health \
     --resource-group agtsdlc-dev-rg --query name --output tsv)"
-  [[ "$execution" =~ ^job-agentsdlc-dev-55eb-health-[a-z0-9]+$ ]] ||
+  [[ "$execution" =~ ^job-agentsdlc-dev-7c77-health-[a-z0-9]+$ ]] ||
     { echo "::error::Health job execution identifier is unexpected."; exit 1; }
   printf '%s\n' "$execution" > health-execution.txt
   for ((attempt=0; attempt<72; attempt++)); do
-    status="$(azure health-status containerapp job execution show --name job-agentsdlc-dev-55eb-health \
+    status="$(azure health-status containerapp job execution show --name job-agentsdlc-dev-7c77-health \
       --resource-group agtsdlc-dev-rg --job-execution-name "$execution" --query properties.status --output tsv)"
     case "$status" in
       Succeeded) audit "health execution succeeded execution=$execution"; exit 0 ;;

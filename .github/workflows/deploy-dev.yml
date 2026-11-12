@@ -164,7 +164,7 @@ jobs:
           ids=()
           for name in portal apigw orders inventory notify; do
             if principal="$(az identity show --subscription "$TARGET_SUBSCRIPTION" \
-              --resource-group agtsdlc-dev-rg --name "ca-agentsdlc-dev-55eb-$name-identity" \
+              --resource-group agtsdlc-dev-rg --name "ca-agentsdlc-dev-7c77-$name-identity" \
               --query principalId --output tsv)"; then
               ids+=("$principal")
             else
@@ -361,7 +361,7 @@ jobs:
           ids=()
           for name in portal apigw orders inventory notify; do
             if principal="$(az identity show --subscription "$TARGET_SUBSCRIPTION" \
-              --resource-group agtsdlc-dev-rg --name "ca-agentsdlc-dev-55eb-$name-identity" \
+              --resource-group agtsdlc-dev-rg --name "ca-agentsdlc-dev-7c77-$name-identity" \
               --query principalId --output tsv)"; then
               ids+=("$principal")
             else
@@ -540,7 +540,7 @@ jobs:
           echo "started registry login run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee image-publish-audit.log
           logged_in=false
           for attempt in 1 2 3 4 5 6; do
-            if az acr login --name cragentsdlcdev55eb --subscription "$TARGET_SUBSCRIPTION"; then
+            if az acr login --name cragentsdlcdev7c77 --subscription "$TARGET_SUBSCRIPTION"; then
               logged_in=true
               break
             fi
@@ -554,7 +554,7 @@ jobs:
           echo "succeeded registry login" | tee -a image-publish-audit.log
           for repo in portal-web api-gateway orders-service inventory-service notifications-service; do
             source="local-gate/$repo:$GITHUB_RUN_ID"
-            target="cragentsdlcdev55eb.azurecr.io/$repo:$GITHUB_RUN_ID"
+            target="cragentsdlcdev7c77.azurecr.io/$repo:$GITHUB_RUN_ID"
             docker image tag "$source" "$target"
             echo "started push image=$repo run=$GITHUB_RUN_ID" | tee -a image-publish-audit.log
             pushed=false
@@ -577,7 +577,7 @@ jobs:
               exit 1
             fi
             echo "started registry digest check image=$repo" | tee -a image-publish-audit.log
-            if registry_digest="$(az acr repository show --name cragentsdlcdev55eb \
+            if registry_digest="$(az acr repository show --name cragentsdlcdev7c77 \
               --subscription "$TARGET_SUBSCRIPTION" --image "$repo:$GITHUB_RUN_ID" \
               --query digest --output tsv)"; then
               echo "succeeded registry digest check image=$repo" | tee -a image-publish-audit.log
@@ -590,7 +590,7 @@ jobs:
               exit 1
             fi
             jq -cn --arg repo "$repo" --arg digest "$digest" \
-              --arg image "cragentsdlcdev55eb.azurecr.io/$repo@$digest" \
+              --arg image "cragentsdlcdev7c77.azurecr.io/$repo@$digest" \
               '{repository:$repo,digest:$digest,image:$image}' >> published-image-lines.json
             echo "succeeded push image=$repo digest=$digest" | tee -a image-publish-audit.log
           done
@@ -704,7 +704,7 @@ jobs:
     environment: dev
     timeout-minutes: 15
     concurrency:
-      group: agentsdlc-dev-55eb-runtime-apply
+      group: agentsdlc-dev-7c77-runtime-apply
       cancel-in-progress: false
       queue: max
     permissions:
@@ -775,7 +775,7 @@ jobs:
     environment: dev
     timeout-minutes: 45
     concurrency:
-      group: agentsdlc-dev-55eb-runtime-apply
+      group: agentsdlc-dev-7c77-runtime-apply
       cancel-in-progress: false
       queue: max
     permissions:
@@ -848,7 +848,7 @@ jobs:
     environment: dev
     timeout-minutes: 25
     concurrency:
-      group: agentsdlc-dev-55eb-runtime-apply
+      group: agentsdlc-dev-7c77-runtime-apply
       cancel-in-progress: false
       queue: max
     permissions:
@@ -927,7 +927,7 @@ jobs:
     environment: dev
     timeout-minutes: 30
     concurrency:
-      group: agentsdlc-dev-55eb-runtime-apply
+      group: agentsdlc-dev-7c77-runtime-apply
       cancel-in-progress: false
       queue: max
     permissions:
@@ -1019,7 +1019,7 @@ jobs:
     environment: dev
     timeout-minutes: 60
     concurrency:
-      group: agentsdlc-dev-55eb-runtime-apply
+      group: agentsdlc-dev-7c77-runtime-apply
       cancel-in-progress: false
       queue: max
     permissions:
@@ -1111,7 +1111,7 @@ jobs:
     environment: dev
     timeout-minutes: 25
     concurrency:
-      group: agentsdlc-dev-55eb-runtime-apply
+      group: agentsdlc-dev-7c77-runtime-apply
       cancel-in-progress: false
       queue: max
     permissions:
@@ -1152,7 +1152,7 @@ jobs:
     environment: dev
     timeout-minutes: 25
     concurrency:
-      group: agentsdlc-dev-55eb-runtime-apply
+      group: agentsdlc-dev-7c77-runtime-apply
       cancel-in-progress: false
       queue: max
     permissions:
@@ -1187,7 +1187,7 @@ jobs:
     environment: dev
     timeout-minutes: 45
     concurrency:
-      group: agentsdlc-dev-55eb-runtime-apply
+      group: agentsdlc-dev-7c77-runtime-apply
       cancel-in-progress: false
       queue: max
     permissions:

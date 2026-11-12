@@ -10,7 +10,7 @@ resource environment 'Microsoft.App/managedEnvironments@2026-07-01' existing = {
 }
 
 resource job 'Microsoft.App/jobs@2026-07-01' = {
-  name: 'job-agentsdlc-dev-55eb-health'
+  name: 'job-agentsdlc-dev-7c77-health'
   location: resourceGroup().location
   tags: foundation.tags.value
   identity: {
@@ -31,7 +31,7 @@ resource job 'Microsoft.App/jobs@2026-07-01' = {
       }
       registries: [
         {
-          server: 'cragentsdlcdev55eb.azurecr.io'
+          server: 'cragentsdlcdev7c77.azurecr.io'
           identity: identityId
         }
       ]
@@ -40,7 +40,7 @@ resource job 'Microsoft.App/jobs@2026-07-01' = {
       containers: [
         {
           name: 'private-health'
-          image: 'cragentsdlcdev55eb.azurecr.io/${release.services[0].name}@${release.services[0].digest}'
+          image: 'cragentsdlcdev7c77.azurecr.io/${release.services[0].name}@${release.services[0].digest}'
           command: [
             'node'
             '-e'
