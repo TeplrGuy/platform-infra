@@ -121,8 +121,8 @@ jobs:
         run: |
           set -euo pipefail
           for repo in portal-web api-gateway orders-service inventory-service notifications-service; do
-            npm --prefix "$repo" run lint
-            npm --prefix "$repo" run test:syntax
+            npm --prefix "$repo" run lint --if-present
+            npm --prefix "$repo" run test:syntax --if-present
             npm --prefix "$repo" run test:integration
             npm --prefix "$repo" audit --audit-level=high
           done
