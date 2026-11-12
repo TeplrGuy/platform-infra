@@ -1,0 +1,23 @@
+name: Shared standards
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  standards:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: consumer
+      - uses: actions/checkout@v4
+        with:
+          repository: TeplrGuy/engineering-skills
+          ref: ef04ca1630a7ae55fc13390ae2cff7c78c0badae
+          path: canonical
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node canonical/scripts/standards.js verify consumer canonical
