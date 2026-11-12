@@ -162,6 +162,15 @@ jobs:
           done
           docker image save "${images[@]}" | gzip -1 > release-images/images.tar.gz
           (cd release-images && sha256sum images.tar.gz images.txt > SHA256SUMS)
+      - name: Verify packaged images and source revisions
+        if: ${{ inputs.preserve_images }}
+        env:
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+        run: node platform-infra/scripts/verify-image-artifact.js loaded release-images "$GITHUB_RUN_ID"
       - name: Preserve verified images
         if: ${{ inputs.preserve_images }}
         uses: actions/upload-artifact@v4

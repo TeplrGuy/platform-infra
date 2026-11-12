@@ -64,9 +64,11 @@ revisions for later promotion; it does not publish or deploy them. The manifest
 records local image IDs, not registry manifest digests. A future publisher must
 verify the archive and record immutable registry digests after pushing.
 `scripts/verify-image-artifact.js` checks archive and manifest hashes against
-the five selected source revisions and can verify loaded Docker image IDs. It
+the five selected source revisions and verifies Docker image IDs before upload. It
 does not authenticate an artifact's source; the release must also obtain it
 from the expected successful quality job and workflow run.
+When preserving images, supply full commit SHAs for all five inputs; branch
+names are not accepted as image provenance.
 GitHub requires the workflow to exist on the default branch before it can be
 dispatched. It is not currently a required PR check or a deployment approval.
 
