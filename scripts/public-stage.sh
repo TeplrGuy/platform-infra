@@ -21,6 +21,37 @@ azure() {
   fi
 }
 
+preview_public_what_if() {
+  local raw_json="public-what-if.raw.json"
+  local stderr_log="public-what-if.stderr.log"
+  local attempts=3
+  local delay_seconds=5
+  : > "$stderr_log"
+  rm -f "$raw_json"
+  for ((attempt=1; attempt<=attempts; attempt++)); do
+    audit "started public-what-if attempt=$attempt"
+    if az deployment group what-if --name "public-preview-$GITHUB_RUN_ID" \
+      --resource-group agtsdlc-dev-rg --parameters infra/public-workloads.bicepparam \
+      --no-pretty-print --no-prompt --output json > "$raw_json" 2>> "$stderr_log"; then
+      if [[ -s "$raw_json" ]] && jq -e '.' "$raw_json" >/dev/null 2>&1; then
+        audit "succeeded public-what-if attempt=$attempt"
+        return 0
+      fi
+      audit "failed public-what-if-invalid-json attempt=$attempt"
+      printf 'what-if returned non-JSON payload on attempt %s\n' "$attempt" >> "$stderr_log"
+    else
+      local code=$?
+      audit "failed public-what-if attempt=$attempt exit=$code"
+    fi
+    if (( attempt < attempts )); then
+      sleep "$delay_seconds"
+      delay_seconds=$((delay_seconds * 2))
+    fi
+  done
+  echo "::error::Public what-if failed after retrying. See public-what-if.stderr.log for diagnostics."
+  return 1
+}
+
 [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ && "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] ||
   { echo "::error::Workflow run or checkout revision is invalid."; exit 1; }
 [[ "${ENTRA_CLIENT_ID:-}" =~ ^[a-fA-F0-9]{8}-([a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$ &&
@@ -57,10 +88,8 @@ if [[ "$mode" == apply && "${ENTRA_REDIRECT_URI:-}" != "$callback_uri" ]]; then
   exit 1
 fi
 
-azure public-what-if deployment group what-if --name "public-preview-$GITHUB_RUN_ID" \
-  --resource-group agtsdlc-dev-rg --parameters infra/public-workloads.bicepparam \
-  --no-pretty-print --no-prompt --output json |
-  node scripts/runtime-preview.js sanitize > public-what-if.json
+preview_public_what_if
+node scripts/runtime-preview.js sanitize < public-what-if.raw.json > public-what-if.json
 node scripts/public-preview.js public-what-if.json "$domain" public-compiled.json
 printf '%s\n' "$domain" > public-domain.txt
 printf '%s\n' "$callback_uri" > public-callback-uri.txt
