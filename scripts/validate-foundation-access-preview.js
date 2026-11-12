@@ -9,7 +9,7 @@ const vault = `${root}/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb`;
 const roleRoot = `/subscriptions/${subscription}/providers/Microsoft.Authorization/roleDefinitions`;
 const acrPull = `${roleRoot}/7f951dda-4ed3-4680-a7ca-43fe172d538d`;
 const secretUser = `${roleRoot}/4633458b-17de-408a-b874-0445c86b69e6`;
-const deployer = 'b6a3c39d-0263-4f01-b975-654cdea443a0';
+const deployer = '68b48a36-c15b-4e51-a9a5-f26e6b6a342b';
 const unchanged = new Map([
   [`${registry}/providers/Microsoft.Authorization/roleAssignments/221ab1b6-b619-5181-a3ae-13e714ec1e42`.toLowerCase(), `${roleRoot}/8311e382-0749-4cb8-b61a-304f252e45ec`.toLowerCase()],
   [`${vault}/providers/Microsoft.Authorization/roleAssignments/dac8d4ef-1356-5c48-822f-63aff5e58233`.toLowerCase(), `${roleRoot}/b86a8fe4-44ce-4948-aee5-eccb2c155cd7`.toLowerCase()]

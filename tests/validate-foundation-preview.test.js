@@ -4,7 +4,7 @@ const { validate, validateAgainst } = require('../scripts/validate-foundation-pr
 
 const subscription = 'b6f10878-9f8a-4b3f-8bc5-3464cdd79c77';
 const tenant = '16b3c013-d300-468d-ac64-7eda0820b6d3';
-const deployer = 'b6a3c39d-0263-4f01-b975-654cdea443a0';
+const deployer = '68b48a36-c15b-4e51-a9a5-f26e6b6a342b';
 const root = `/subscriptions/${subscription}/resourceGroups/agtsdlc-dev-rg/providers`;
 const registry = `${root}/Microsoft.ContainerRegistry/registries/cragentsdlcdev55eb`;
 const vault = `${root}/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb`;

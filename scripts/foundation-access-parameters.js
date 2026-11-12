@@ -10,7 +10,7 @@ function createParameters(principalIds) {
     parameters: {
       registryName: { value: 'cragentsdlcdev55eb' },
       keyVaultName: { value: 'kv-agentsdlc-dev-55eb' },
-      deployerObjectId: { value: 'b6a3c39d-0263-4f01-b975-654cdea443a0' },
+      deployerObjectId: { value: '68b48a36-c15b-4e51-a9a5-f26e6b6a342b' },
       appPrincipalIds: { value: [...principalIds] }
     }
   };
