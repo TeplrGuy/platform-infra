@@ -143,6 +143,9 @@ This initial create-only path fails closed if applications already exist; recove
 requires a separate reviewed path. It does not establish application health or
 enable public access. In-environment functional and durability checks, Entra sign-in,
 and protected public promotion remain required.
+`foundation_action: health-preview` previews a separate manual, read-only
+Container Apps Job for checking private service health from within the same
+environment. Preview alone neither creates nor runs the job.
 The test, production, and rollback workflows remain blocked and must be
 adapted to resource-group-scope deployment and verified before enabling them.
 `infra/rg-rbac-condition.txt` is a proposed Azure RBAC condition for scoped
