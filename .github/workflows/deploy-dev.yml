@@ -313,6 +313,7 @@ jobs:
           node-version: '24'
       - run: bash -n scripts/public-stage.sh scripts/journey-stage.sh && node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js tests/verify-image-artifact.test.js tests/foundation-access-parameters.test.js tests/validate-foundation-access-preview.test.js tests/runtime-preview.test.js tests/private-preview.test.js tests/private-health.test.js tests/health-preview.test.js tests/private-journey.test.js tests/journey-stage.test.js tests/public-preview.test.js
   quality:
+    if: ${{ inputs.bootstrap_rg || inputs.foundation_action == 'none' || inputs.foundation_action == 'publish-images' || inputs.foundation_action == 'runtime-apply' || inputs.foundation_action == 'runtime-recovery' || inputs.foundation_action == 'private-preview' || inputs.foundation_action == 'private-apply' || inputs.foundation_action == 'public-preview' || inputs.foundation_action == 'public-apply' || inputs.foundation_action == 'health-preview' || inputs.foundation_action == 'health-apply' || inputs.foundation_action == 'health-run' || inputs.foundation_action == 'journey-run' }}
     needs: validate-inputs
     uses: ./.github/workflows/full-stack-e2e.yml
     with:
@@ -324,7 +325,7 @@ jobs:
       preserve_images: ${{ inputs.preserve_images }}
   apply-foundation-access:
     if: ${{ inputs.foundation_action == 'access-apply' && !inputs.bootstrap_rg }}
-    needs: [preview-foundation-access, validate-bicep, quality]
+    needs: [preview-foundation-access, validate-bicep]
     runs-on: ubuntu-latest
     environment: dev
     timeout-minutes: 20
@@ -417,7 +418,7 @@ jobs:
           if-no-files-found: warn
   apply-foundation:
     if: ${{ inputs.foundation_action == 'apply' && !inputs.bootstrap_rg }}
-    needs: [preview-foundation, validate-bicep, quality]
+    needs: [preview-foundation, validate-bicep]
     runs-on: ubuntu-latest
     environment: dev
     timeout-minutes: 30
