@@ -112,7 +112,13 @@ case "$mode" in
     fi
     ;;
   secrets-apply)
-    [[ "$(credential_state)" == missing ]] || { echo "::error::Credential state changed after approval."; exit 1; }
+    credential_status="$(credential_state)"
+    if [[ "$credential_status" == exists ]]; then
+      audit "credential-reuse seed step skipped because credential already exists"
+      load_password
+      exit 0
+    fi
+    [[ "$credential_status" == missing ]] || { echo "::error::Credential state changed after approval."; exit 1; }
     require_new_database
     export POSTGRES_ADMIN_PASSWORD=PreviewOnly_NotAnActualCredential7c770123456789
     preview secrets infra/runtime-secrets.bicepparam
