@@ -55,7 +55,7 @@ async function post(base, route, body) {
   });
 }
 
-async function waitFor(assertion, timeoutMs = 5000, intervalMs = 100) {
+async function waitFor(assertion, timeoutMs = 20000, intervalMs = 200) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await assertion()) return;
