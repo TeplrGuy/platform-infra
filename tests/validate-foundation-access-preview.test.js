@@ -9,7 +9,7 @@ const registry = `${root}/Microsoft.ContainerRegistry/registries/cragentsdlcdev5
 const vault = `${root}/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb`;
 const roleRoot = `/subscriptions/${subscription}/providers/Microsoft.Authorization/roleDefinitions`;
 const ids = [1, 2, 3, 4, 5].map(i => `00000000-0000-0000-0000-00000000000${i}`);
-const deployer = 'b6a3c39d-0263-4f01-b975-654cdea443a0';
+const deployer = '68b48a36-c15b-4e51-a9a5-f26e6b6a342b';
 
 function fixture() {
   const parameters = createParameters(ids);
