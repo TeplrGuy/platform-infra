@@ -1,0 +1,103 @@
+name: Full-stack browser rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      portal_ref:
+        description: Portal commit SHA or ref containing the live browser test
+        required: true
+        default: main
+        type: string
+      gateway_ref:
+        description: Gateway commit SHA or ref
+        required: true
+        default: main
+        type: string
+      orders_ref:
+        description: Orders commit SHA or ref
+        required: true
+        default: main
+        type: string
+      inventory_ref:
+        description: Inventory commit SHA or ref
+        required: true
+        default: main
+        type: string
+      notifications_ref:
+        description: Notifications commit SHA or ref
+        required: true
+        default: main
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rehearsal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sdlctest
+          POSTGRES_PASSWORD: local-test-only
+          POSTGRES_DB: sdlc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sdlctest -d sdlc_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: platform-infra
+      - uses: actions/checkout@v4
+        with:
+          repository: TeplrGuy/portal-web
+          ref: ${{ inputs.portal_ref }}
+          path: portal-web
+      - uses: actions/checkout@v4
+        with:
+          repository: TeplrGuy/api-gateway
+          ref: ${{ inputs.gateway_ref }}
+          path: api-gateway
+      - uses: actions/checkout@v4
+        with:
+          repository: TeplrGuy/orders-service
+          ref: ${{ inputs.orders_ref }}
+          path: orders-service
+      - uses: actions/checkout@v4
+        with:
+          repository: TeplrGuy/inventory-service
+          ref: ${{ inputs.inventory_ref }}
+          path: inventory-service
+      - uses: actions/checkout@v4
+        with:
+          repository: TeplrGuy/notifications-service
+          ref: ${{ inputs.notifications_ref }}
+          path: notifications-service
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: |
+          for repo in portal-web api-gateway orders-service inventory-service notifications-service; do
+            npm ci --no-audit --no-fund --prefix "$repo"
+          done
+      - name: Install Chromium
+        working-directory: portal-web
+        run: npx playwright install --with-deps chromium
+      - name: Record tested revisions
+        run: |
+          for repo in platform-infra portal-web api-gateway orders-service inventory-service notifications-service; do
+            echo "$repo: $(git -C "$repo" rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Verify durable state across replicas and restarts
+        env:
+          TEST_DATABASE_URL: postgresql://sdlctest:local-test-only@127.0.0.1:5432/sdlc_test
+        run: node --test platform-infra/tests/postgres-state.test.js
+      - name: Exercise the order journey and verify distributed tracing
+        run: node platform-infra/scripts/validate-telemetry.js

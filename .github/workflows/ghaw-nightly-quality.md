@@ -10,7 +10,7 @@ permissions:
   issues: read
   pull-requests: read
 tracker-id: infra-nightly-quality
-max-ai-credits: 3
+max-ai-credits: 250
 safe-outputs:
   create-issue:
     title-prefix: "[nightly-quality] "

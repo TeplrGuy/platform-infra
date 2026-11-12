@@ -14,6 +14,50 @@ Infrastructure baseline for the SDLC demo platform in **North Europe**.
 - `.github/workflows/promote-test.yml`: Test promotion deployment
 - `.github/workflows/promote-prod.yml`: Prod promotion deployment
 - `.github/workflows/rollback.yml`: Environment rollback to a known good Git ref
+- `.github/workflows/full-stack-e2e.yml`: Manually run an unmocked browser journey across all five services
+
+## Local full-stack browser rehearsal
+
+With Node.js 24 installed, clone `portal-web`, `api-gateway`, `orders-service`, `inventory-service`, and
+`notifications-service` beside this repository. Run `npm ci` in each, then
+`npx playwright install chromium` in `portal-web`. Run
+`node scripts/full-stack-e2e.js` from this repository. The script starts isolated
+local services, runs the real browser flow, and stops its child processes. State
+is in memory and is lost when the services stop.
+
+The application Dockerfiles default to the public npm registry. In an
+environment that requires a trusted registry mirror, supply its HTTPS URL as
+the `NPM_CONFIG_REGISTRY` Docker build argument. Do not put credentials in the
+URL or build arguments; use a secure build-time secret mechanism if needed.
+
+For the durable-state integration check, install the service dependencies and
+set `TEST_DATABASE_URL` to an isolated PostgreSQL database whose name ends in
+`_test`. Run `node --test tests/postgres-state.test.js` from `platform-infra`,
+with the application repositories cloned beside it. The check creates and deletes a uniquely
+named schema, starts multiple replicas, and exercises concurrent reservations,
+duplicate orders, and service restarts. It skips when `TEST_DATABASE_URL` is
+unset. Do not point it at a shared or production database.
+
+Run `node scripts/validate-telemetry.js` to additionally start a local OTLP
+collector and assert that a single trace reaches all five services. The
+rehearsal removes inherited Azure Monitor settings and only accepts a loopback
+telemetry collector. It samples every local trace and waits for the expected
+exports before stopping the services. This does not change production sampling
+or verify Azure Monitor ingestion, alerts, or an SRE Agent connection.
+
+When `APPLICATIONINSIGHTS_CONNECTION_STRING` is set, each service initializes
+Microsoft OpenTelemetry before loading Express. Traces propagate through Node's
+`fetch`; request URL attributes are reduced to known route templates and query
+values are redacted. Review telemetry and retention for your data classification
+before using real customer data. Local instrumentation can instead use
+`OTEL_EXPORTER_OTLP_ENDPOINT`.
+
+The manually dispatched workflow accepts a ref for each application and records
+the resolved commit SHAs in its job summary. Supply commit SHAs for repeatable
+cross-repository evidence. It also runs the durable-state test against an
+ephemeral PostgreSQL service; the browser/trace journey remains in-memory.
+GitHub requires the workflow to exist on the default branch before it can be
+dispatched. It is not currently a required PR check or a deployment approval.
 
 ## Resources provisioned
 
@@ -55,6 +99,6 @@ Then configure GitHub Environments `dev`, `test`, and `prod` with approval rules
 1. Start with a GitHub issue and acceptance criteria in one of the service repos.
 2. Implement in a short-lived branch, open a PR, and link the issue.
 3. Use PR checklist + CODEOWNERS + `ci` + `security` workflows as merge gates.
-4. Run `deploy-dev` after merge, validate behavior, and promote with `promote-test` then `promote-prod`.
-5. If degradation appears, run `rollback` with the last known good commit SHA and document follow-up actions in a new issue.
+4. Deployment workflows are deliberately blocked: the templates still use placeholder application images. Implement and verify immutable releases before enabling them.
+5. Rollback is deliberately blocked: redeploying a Git ref does not restore a verified application image. Establish image-based rollback before enabling it.
 6. Use `portal-web` to demonstrate the visible customer flow and link the runtime behavior back to GitHub issues, PRs, and workflows.

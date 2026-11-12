@@ -25,7 +25,15 @@ permissions:
   contents: read
 
 jobs:
+  block-unsafe-release:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - run: |
+          echo "::error::Disabled: redeploying a Git ref does not restore verified application images. Implement image-based rollback before enabling this workflow."
+          exit 1
   deploy:
+    needs: block-unsafe-release
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment_name }}
     timeout-minutes: 25
