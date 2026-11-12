@@ -58,7 +58,7 @@ async function post(base, route, body) {
 test('PostgreSQL state survives restarts and coordinates replicas', { skip: !connectionString }, async () => {
   const database = decodeURIComponent(new URL(connectionString).pathname.slice(1));
   if (!database.endsWith('_test')) throw new Error('TEST_DATABASE_URL must identify a database ending in _test');
-  const { Pool } = require(path.join(root, 'orders-service', 'node_modules', 'pg'));
+  const { Pool } = require('pg');
   const pool = new Pool({ connectionString });
   const schema = `sdlc_test_${randomBytes(12).toString('hex')}`;
   const children = [];
