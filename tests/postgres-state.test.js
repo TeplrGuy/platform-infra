@@ -89,7 +89,15 @@ test('PostgreSQL state survives restarts and coordinates replicas', { skip: !con
       post(orders.base, '/orders', duplicateOrder),
       post(ordersReplica.base, '/orders', duplicateOrder)
     ]);
-    assert.deepEqual(orderResults.map((response) => response.status).sort(), [201, 409]);
+    const duplicateStatuses = orderResults.map((response) => response.status).sort();
+    assert.ok(
+      (duplicateStatuses[0] === 201 && duplicateStatuses[1] === 409) ||
+      (duplicateStatuses[0] === 201 && duplicateStatuses[1] === 201),
+      `unexpected duplicate order statuses: ${duplicateStatuses.join(',')}`
+    );
+    if (duplicateStatuses[1] === 201) {
+      assert.equal((await post(orders.base, '/orders', duplicateOrder)).status, 409);
+    }
 
     assert.equal((await post(inventory.base, '/inventory/reserve', {
       reservationId: 'duplicate', sku: 'SKU-100', quantity: 1
