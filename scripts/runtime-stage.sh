@@ -66,12 +66,12 @@ load_password() {
 }
 
 preview() {
-  local stage="$1" template="$2"
+  local stage="$1" template="$2" validate_stage="${3:-$1}"
   azure "$stage-what-if" deployment group what-if \
     --name "runtime-$stage-preview-$GITHUB_RUN_ID" --resource-group agtsdlc-dev-rg \
     --parameters "$template" --no-pretty-print --no-prompt --output json |
     node scripts/runtime-preview.js sanitize > runtime-what-if.json
-  node scripts/runtime-preview.js "$stage" runtime-what-if.json
+  node scripts/runtime-preview.js "$validate_stage" runtime-what-if.json
   git ls-files -z infra scripts/runtime-stage.sh scripts/runtime-preview.js | xargs -0 sha256sum > runtime-template.sha256
 }
 
@@ -100,7 +100,7 @@ apply() {
 case "$mode" in
   secrets-preview)
     export POSTGRES_ADMIN_PASSWORD="$RUNTIME_POSTGRES_PASSWORD"
-    preview secrets infra/runtime-secrets.bicepparam
+    preview secrets infra/runtime-secrets.bicepparam secrets-check
     change_type="$(secrets_change_type)"
     case "$change_type" in
       Create)
