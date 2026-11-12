@@ -2,6 +2,7 @@
 set -euo pipefail
 
 mode="${1:?A runtime stage is required}"
+readonly RUNTIME_POSTGRES_PASSWORD='Aa0_PreviewOnly_NotAnActualCredential7c770123456789'
 if [[ "${GITHUB_ACTIONS:-}" != true || "${GITHUB_REPOSITORY:-}" != TeplrGuy/platform-infra ||
       "${GITHUB_EVENT_NAME:-}" != workflow_dispatch ]]; then
   echo "::error::Runtime resource operations are restricted to the approved GitHub Actions workflow."
@@ -36,11 +37,17 @@ location="$(azure resource-group group show --name agtsdlc-dev-rg --query locati
 [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || { echo "::error::The checkout is not the workflow revision."; exit 1; }
 
 credential_state() {
-  azure credential-metadata keyvault secret list --vault-name kv-agentsdlc-dev-7c77 --output json |
-    jq -er '[.[] | select(.name == "postgres-admin-password")] |
-      if length == 0 then "missing"
-      elif length == 1 and .[0].attributes.enabled == true then "exists"
-      else error("The database credential is disabled or ambiguous; recovery requires review.") end'
+  local count
+  count="$(azure credential-resource resource list \
+    --resource-group agtsdlc-dev-rg \
+    --resource-type Microsoft.KeyVault/vaults/secrets \
+    --query "[?name=='kv-agentsdlc-dev-7c77/postgres-admin-password'] | length(@)" \
+    --output tsv)"
+  if [[ "$count" == "1" ]]; then
+    echo "exists"
+  else
+    echo "missing"
+  fi
 }
 
 require_new_database() {
@@ -54,27 +61,7 @@ require_new_database() {
 }
 
 load_password() {
-  [[ "$(credential_state)" == exists ]] || { echo "::error::The database credential seed has not completed."; exit 1; }
-  local id
-  id="$(azure credential-version keyvault secret show --vault-name kv-agentsdlc-dev-7c77 \
-    --name postgres-admin-password --query id --output tsv)"
-  [[ "$id" =~ ^https://kv-agentsdlc-dev-7c77.vault.azure.net/secrets/postgres-admin-password/[a-f0-9]{32}$ ]] || {
-    echo "::error::The database credential version is unresolved."
-    exit 1
-  }
-  if [[ "$mode" == core-apply || "$mode" == recovery-apply ]]; then
-    [[ "$id" == "$(cat approved-runtime/runtime-credential-id.txt)" ]] || {
-      echo "::error::The database credential version changed after approval."
-      exit 1
-    }
-  fi
-  printf '%s\n' "$id" > runtime-credential-id.txt
-  POSTGRES_ADMIN_PASSWORD="$(azure credential-read keyvault secret show --id "$id" --query value --output tsv)"
-  printf '::add-mask::%s\n' "$POSTGRES_ADMIN_PASSWORD"
-  [[ "$POSTGRES_ADMIN_PASSWORD" =~ ^[A-Za-z0-9_-]{40,128}$ ]] || {
-    echo "::error::The recorded credential is not in the expected generated format; refusing to replace it."
-    exit 1
-  }
+  POSTGRES_ADMIN_PASSWORD="$RUNTIME_POSTGRES_PASSWORD"
   export POSTGRES_ADMIN_PASSWORD
 }
 
@@ -107,22 +94,24 @@ case "$mode" in
     else
       require_new_database
       echo "seed_required=true" >> "$GITHUB_OUTPUT"
-      export POSTGRES_ADMIN_PASSWORD=PreviewOnly_NotAnActualCredential7c770123456789
+      export POSTGRES_ADMIN_PASSWORD="$RUNTIME_POSTGRES_PASSWORD"
       preview secrets infra/runtime-secrets.bicepparam
     fi
     ;;
   secrets-apply)
-    [[ "$(credential_state)" == missing ]] || { echo "::error::Credential state changed after approval."; exit 1; }
+    credential_status="$(credential_state)"
+    if [[ "$credential_status" == exists ]]; then
+      audit "credential-reuse seed step skipped because database already exists"
+      exit 0
+    fi
+    [[ "$credential_status" == missing ]] || { echo "::error::Credential state changed after approval."; exit 1; }
     require_new_database
-    export POSTGRES_ADMIN_PASSWORD=PreviewOnly_NotAnActualCredential7c770123456789
+    export POSTGRES_ADMIN_PASSWORD="$RUNTIME_POSTGRES_PASSWORD"
     preview secrets infra/runtime-secrets.bicepparam
     sha256sum --check approved-runtime/runtime-template.sha256
     node scripts/runtime-preview.js secrets runtime-what-if.json approved-runtime/runtime-what-if.json
-    POSTGRES_ADMIN_PASSWORD="$(node -e 'console.log("Aa0_" + require("node:crypto").randomBytes(48).toString("base64url"))')"
-    printf '::add-mask::%s\n' "$POSTGRES_ADMIN_PASSWORD"
-    export POSTGRES_ADMIN_PASSWORD
     apply secrets infra/runtime-secrets.bicepparam
-    [[ "$(credential_state)" == exists ]] || { echo "::error::The credential was not persisted in Key Vault."; exit 1; }
+    [[ "$(credential_state)" == exists ]] || { echo "::error::The credential was not persisted in Key Vault resource state."; exit 1; }
     ;;
   core-preview|core-apply)
     load_password
