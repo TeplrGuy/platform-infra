@@ -30,8 +30,8 @@ function validate(preview) {
   const actual = new Map();
   const roleAssignments = new Map();
   for (const change of preview.changes) {
-    if (!['Create', 'NoChange'].includes(change.changeType) || typeof change.resourceId !== 'string' || !change.after) {
-      throw new Error('Foundation preview must contain only fully resolved creates or unchanged resources.');
+    if (!['Create', 'NoChange', 'Modify'].includes(change.changeType) || typeof change.resourceId !== 'string' || !change.after) {
+      throw new Error('Foundation preview must contain only fully resolved create, unchanged, or modify resources.');
     }
     const id = change.resourceId.toLowerCase();
     if (change.after.id?.toLowerCase() !== id) {
