@@ -42,6 +42,18 @@ test('public ingress is opt-in and requires application authentication', () => {
   assert.ok(auth.dependsOn.includes('apps'));
 });
 
+test('service callers use HTTPS and internal Container Apps hostnames', () => {
+  const template = getTemplate().resources.apps.properties.template;
+  assert.ok(template.variables.services.slice(1).every(service => service.external === false));
+  const app = Object.values(template.resources).find(resource => resource.type === 'Microsoft.App/containerApps');
+  const urls = app.properties.template.containers[0].env.match(
+    /concat\('https:\/\/', variables\('names'\)\[\d+\], '\.internal\.', parameters\('environmentDefaultDomain'\)\)/g
+  );
+  assert.deepEqual(urls, [1, 2, 3, 3, 4].map(index =>
+    `concat('https://', variables('names')[${index}], '.internal.', parameters('environmentDefaultDomain'))`
+  ));
+});
+
 test('foundation contains no workload or secrets and scopes publisher access to the registry', () => {
   const template = getTemplate('infra/foundation.bicep');
   const foundation = JSON.parse(readFileSync(path.join(__dirname, '../infra/foundation.parameters.json')));

@@ -89,6 +89,11 @@ serialize deployments without canceling pending or running work.
 Public portal ingress defaults to disabled. A future staged release must first
 create the portal internally, configure and verify Entra authentication, then
 explicitly enable public ingress through the protected deployment pipeline.
+Service-to-service URLs use HTTPS and the internal Container Apps hostname
+format (`<app>.internal.<environment-domain>`). These endpoints are reachable
+only from apps in the same environment, so live backend probes must run there,
+not directly on a public GitHub-hosted runner. See
+[Container Apps service discovery](https://learn.microsoft.com/azure/container-apps/connect-apps).
 Application identities and registry/Key Vault role assignments are created
 before the apps. Application creation defaults off via `deployApplications`,
 so a future pipeline can publish images and wait for RBAC propagation before

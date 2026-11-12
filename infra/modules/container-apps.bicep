@@ -88,21 +88,21 @@ resource apps 'Microsoft.App/containerApps@2026-07-01' = [
               ],
               service.name == 'portal-web'
                 ? [
-                    { name: 'API_GATEWAY_URL', value: concat('http://', names[1], '.', environmentDefaultDomain) }
+                    { name: 'API_GATEWAY_URL', value: concat('https://', names[1], '.internal.', environmentDefaultDomain) }
                   ]
                 : [],
               service.name == 'api-gateway'
                 ? [
-                    { name: 'ORDERS_SERVICE_URL', value: concat('http://', names[2], '.', environmentDefaultDomain) }
-                    { name: 'INVENTORY_SERVICE_URL', value: concat('http://', names[3], '.', environmentDefaultDomain) }
+                    { name: 'ORDERS_SERVICE_URL', value: concat('https://', names[2], '.internal.', environmentDefaultDomain) }
+                    { name: 'INVENTORY_SERVICE_URL', value: concat('https://', names[3], '.internal.', environmentDefaultDomain) }
                   ]
                 : [],
               service.name == 'orders-service'
                 ? [
-                    { name: 'INVENTORY_SERVICE_URL', value: concat('http://', names[3], '.', environmentDefaultDomain) }
+                    { name: 'INVENTORY_SERVICE_URL', value: concat('https://', names[3], '.internal.', environmentDefaultDomain) }
                     {
                       name: 'NOTIFICATIONS_SERVICE_URL'
-                      value: concat('http://', names[4], '.', environmentDefaultDomain)
+                      value: concat('https://', names[4], '.internal.', environmentDefaultDomain)
                     }
                   ]
                 : [],
