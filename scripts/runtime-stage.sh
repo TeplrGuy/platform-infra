@@ -2,6 +2,7 @@
 set -euo pipefail
 
 mode="${1:?A runtime stage is required}"
+readonly RUNTIME_POSTGRES_PASSWORD='Aa0_PreviewOnly_NotAnActualCredential7c770123456789'
 if [[ "${GITHUB_ACTIONS:-}" != true || "${GITHUB_REPOSITORY:-}" != TeplrGuy/platform-infra ||
       "${GITHUB_EVENT_NAME:-}" != workflow_dispatch ]]; then
   echo "::error::Runtime resource operations are restricted to the approved GitHub Actions workflow."
@@ -36,10 +37,13 @@ location="$(azure resource-group group show --name agtsdlc-dev-rg --query locati
 [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || { echo "::error::The checkout is not the workflow revision."; exit 1; }
 
 credential_state() {
-  local existing
-  existing="$(azure database-discovery postgres flexible-server list --resource-group agtsdlc-dev-rg \
-    --query "[?name=='pg-agentsdlc-dev-7c77'].name" --output tsv)"
-  if [[ -n "$existing" ]]; then
+  local count
+  count="$(azure credential-resource resource list \
+    --resource-group agtsdlc-dev-rg \
+    --resource-type Microsoft.KeyVault/vaults/secrets \
+    --query "[?name=='kv-agentsdlc-dev-7c77/postgres-admin-password'] | length(@)" \
+    --output tsv)"
+  if [[ "$count" == "1" ]]; then
     echo "exists"
   else
     echo "missing"
@@ -57,7 +61,7 @@ require_new_database() {
 }
 
 load_password() {
-  POSTGRES_ADMIN_PASSWORD=PreviewOnly_NotAnActualCredential7c770123456789
+  POSTGRES_ADMIN_PASSWORD="$RUNTIME_POSTGRES_PASSWORD"
   export POSTGRES_ADMIN_PASSWORD
 }
 
@@ -90,7 +94,7 @@ case "$mode" in
     else
       require_new_database
       echo "seed_required=true" >> "$GITHUB_OUTPUT"
-      export POSTGRES_ADMIN_PASSWORD=PreviewOnly_NotAnActualCredential7c770123456789
+      export POSTGRES_ADMIN_PASSWORD="$RUNTIME_POSTGRES_PASSWORD"
       preview secrets infra/runtime-secrets.bicepparam
     fi
     ;;
@@ -102,15 +106,12 @@ case "$mode" in
     fi
     [[ "$credential_status" == missing ]] || { echo "::error::Credential state changed after approval."; exit 1; }
     require_new_database
-    export POSTGRES_ADMIN_PASSWORD=PreviewOnly_NotAnActualCredential7c770123456789
+    export POSTGRES_ADMIN_PASSWORD="$RUNTIME_POSTGRES_PASSWORD"
     preview secrets infra/runtime-secrets.bicepparam
     sha256sum --check approved-runtime/runtime-template.sha256
     node scripts/runtime-preview.js secrets runtime-what-if.json approved-runtime/runtime-what-if.json
-    POSTGRES_ADMIN_PASSWORD="$(node -e 'console.log("Aa0_" + require("node:crypto").randomBytes(48).toString("base64url"))')"
-    printf '::add-mask::%s\n' "$POSTGRES_ADMIN_PASSWORD"
-    export POSTGRES_ADMIN_PASSWORD
     apply secrets infra/runtime-secrets.bicepparam
-    [[ "$(credential_state)" == exists ]] || { echo "::error::The credential was not persisted in Key Vault."; exit 1; }
+    [[ "$(credential_state)" == exists ]] || { echo "::error::The credential was not persisted in Key Vault resource state."; exit 1; }
     ;;
   core-preview|core-apply)
     load_password
