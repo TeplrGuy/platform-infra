@@ -17,8 +17,8 @@ const tags = {
   environment: 'agentsdlc-dev-7c77'
 };
 const roles = new Map([
-  [`${registry}/providers/Microsoft.Authorization/roleAssignments/aa520d40-5903-5831-987c-f3857fe688c0`, '8311e382-0749-4cb8-b61a-304f252e45ec'],
-  [`${vault}/providers/Microsoft.Authorization/roleAssignments/a248f7fa-c840-53f1-bb9d-311671c2f582`, 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7']
+  [`${registry}/providers/Microsoft.Authorization/roleAssignments/e5099734-5264-54b4-9ca8-0ce1a5f8a2ae`, '8311e382-0749-4cb8-b61a-304f252e45ec'],
+  [`${vault}/providers/Microsoft.Authorization/roleAssignments/bd65f59a-6054-566f-86cc-95fe68295d22`, 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7']
 ]);
 const ids = [registry, vault,
   ...identityNames.map(name => `${root}/Microsoft.ManagedIdentity/userAssignedIdentities/${name}`),

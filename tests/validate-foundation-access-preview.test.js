@@ -23,8 +23,8 @@ function fixture() {
       properties: { principalId, roleDefinitionId: `${roleRoot}/${role}` }
     } });
   }
-  grant(registry, 'aa520d40-5903-5831-987c-f3857fe688c0', deployer, '8311e382-0749-4cb8-b61a-304f252e45ec', 'NoChange');
-  grant(vault, 'a248f7fa-c840-53f1-bb9d-311671c2f582', deployer, 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7', 'NoChange');
+  grant(registry, 'e5099734-5264-54b4-9ca8-0ce1a5f8a2ae', deployer, '8311e382-0749-4cb8-b61a-304f252e45ec', 'NoChange');
+  grant(vault, 'bd65f59a-6054-566f-86cc-95fe68295d22', deployer, 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7', 'NoChange');
   ids.forEach((id, i) => grant(registry, `11111111-1111-1111-1111-11111111111${i}`, id,
     '7f951dda-4ed3-4680-a7ca-43fe172d538d', 'Create'));
   [0, 2, 3, 4].forEach((i, j) => grant(vault, `22222222-2222-2222-2222-22222222222${j}`, ids[i],
