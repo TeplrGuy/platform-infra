@@ -190,8 +190,8 @@ does not deploy the application.
 Set these variables on the `platform-infra` `dev` environment:
 
 - `AZURE_CLIENT_ID`
-- `AZURE_TENANT_ID` (`d11cdc76-c6f2-4368-a98f-498e78a7e011`)
-- `AZURE_SUBSCRIPTION_ID` (`8fcc5e8e-6540-4288-89e7-849e94290205`)
+- `AZURE_TENANT_ID` (`16b3c013-d300-468d-ac64-7eda0820b6d3`)
+- `AZURE_SUBSCRIPTION_ID` (`b6f10878-9f8a-4b3f-8bc5-3464cdd79c77`)
 
 The `dev` environment requires an approved human reviewer and disables admin
 bypass. Self-review is allowed because TeplrGuy is the only available reviewer;

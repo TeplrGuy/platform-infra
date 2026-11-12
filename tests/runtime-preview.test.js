@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { sanitize, validate, validateAgainst } = require('../scripts/runtime-preview');
 const tags = require('../infra/foundation.parameters.json').parameters.tags.value;
-const root = '/subscriptions/8fcc5e8e-6540-4288-89e7-849e94290205/resourceGroups/agtsdlc-dev-rg/providers/';
+const root = '/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/';
 const pg = 'Microsoft.DBforPostgreSQL/flexibleServers/pg-agentsdlc-dev-55eb';
 
 function resource(path, type, properties, other = {}) {
