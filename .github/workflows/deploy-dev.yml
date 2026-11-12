@@ -731,15 +731,15 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
-      - id: azure-login-private-apply
+      - id: azure-login-private-preview
         continue-on-error: true
         uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Retry Azure login for private apply
-        if: ${{ steps.azure-login-private-apply.outcome == 'failure' }}
+      - name: Retry Azure login for private preview
+        if: ${{ steps.azure-login-private-preview.outcome == 'failure' }}
         uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -820,15 +820,15 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
-      - id: azure-login-private-apply
+      - id: azure-login-private-preview
         continue-on-error: true
         uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Retry Azure login for private apply
-        if: ${{ steps.azure-login-private-apply.outcome == 'failure' }}
+      - name: Retry Azure login for private preview
+        if: ${{ steps.azure-login-private-preview.outcome == 'failure' }}
         uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -868,7 +868,16 @@ jobs:
         with:
           name: runtime-recovery-preview-${{ github.run_id }}
           path: approved-runtime
-      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+      - id: azure-login-private-preview
+        continue-on-error: true
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Retry Azure login for private preview
+        if: ${{ steps.azure-login-private-preview.outcome == 'failure' }}
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -899,7 +908,16 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
-      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+      - id: azure-login-private-apply
+        continue-on-error: true
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Retry Azure login for private apply
+        if: ${{ steps.azure-login-private-apply.outcome == 'failure' }}
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -946,7 +964,16 @@ jobs:
         with:
           name: private-preview-${{ github.run_id }}
           path: approved-private
-      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+      - id: azure-login-private-apply
+        continue-on-error: true
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Retry Azure login for private apply
+        if: ${{ steps.azure-login-private-apply.outcome == 'failure' }}
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -970,6 +997,8 @@ jobs:
             private-what-if.json
             private-domain.txt
             private-template.sha256
+            private-apply-error.txt
+            private-apply-operations.json
           if-no-files-found: warn
   preview-public-workloads:
     if: ${{ inputs.foundation_action == 'public-preview' || inputs.foundation_action == 'public-apply' }}

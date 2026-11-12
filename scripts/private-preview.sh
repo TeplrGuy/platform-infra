@@ -69,6 +69,20 @@ if [[ "$mode" == apply ]]; then
   if ! state="$(az deployment group create --name "$deployment" --resource-group agtsdlc-dev-rg \
     --template-file private-compiled.json --parameters @private-parameters.json \
     --mode Incremental --query properties.provisioningState --output tsv 2>private-apply-error.txt)"; then
+    az deployment operation group list --resource-group agtsdlc-dev-rg --name "$deployment" --output json \
+      > private-apply-operations.json 2>/dev/null || true
+    if [[ -s private-apply-operations.json ]]; then
+      node -e '
+        const fs = require("fs");
+        const ops = JSON.parse(fs.readFileSync("private-apply-operations.json", "utf8"));
+        const failed = ops.filter(op => op?.properties?.provisioningState === "Failed").map(op => ({
+          target: op?.properties?.targetResource?.resourceName ?? "unknown",
+          code: op?.properties?.statusMessage?.error?.code ?? "Unknown",
+          message: op?.properties?.statusMessage?.error?.message ?? "No message",
+        }));
+        if (failed.length) console.error(JSON.stringify({ failedOperations: failed }, null, 2));
+      ' || true
+    fi
     audit "failed private-apply deployment=$deployment; inspect Azure deployment operations"
     echo "::error::Private workload deployment failed; inspect the Azure deployment operations for details."
     exit 1
