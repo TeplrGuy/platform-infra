@@ -1,10 +1,10 @@
 {
-  "publisherRun": "43133264052",
+  "publisherRun": "43311421332",
   "services": [
-    { "name": "portal-web", "key": "portal", "refEnv": "PORTAL_REF", "revision": "909e5b86a202024fb6c9bf072c0c6dc357ecd917", "digest": "sha256:1c6b9c4b2a33ffbe23f87893393850dda6e6b87ecca86ee04ba5ea0df73ff09a" },
-    { "name": "api-gateway", "key": "apiGateway", "refEnv": "GATEWAY_REF", "revision": "83dac082f160da300faf71a4178221ac1342ff50", "digest": "sha256:73e10fcd086a0d7ca7404323d7f4d545da71fda31cf94f67f643a6a5b8dc27ce" },
-    { "name": "orders-service", "key": "orders", "refEnv": "ORDERS_REF", "revision": "3dfdf891c0f5fe1da51cd59db6fb24672665ec94", "digest": "sha256:12b4f2d6cd883d6cb6d89efe23c789d4f6c26171c7aa517d42f6915f3f504ee1" },
-    { "name": "inventory-service", "key": "inventory", "refEnv": "INVENTORY_REF", "revision": "22fe924aa6581d1d88960dce11b8e919f10e4415", "digest": "sha256:496ac4771fd5e5f33cfb889038c4b07ccf55fd37126438ebdcb0fecd35c595f4" },
-    { "name": "notifications-service", "key": "notifications", "refEnv": "NOTIFICATIONS_REF", "revision": "1fe9a2fdd53e8ca9a4796dc5f11bcf2365360919", "digest": "sha256:fff81bc472eeaf9b08de6b35f77771f207c89cfb37ce063e31991c93117dd72c" }
+    { "name": "portal-web", "key": "portal", "refEnv": "PORTAL_REF", "revision": "e27c5c848b2cdcc3801f0955f2cd960e3e48cefb", "digest": "sha256:10ab9bf03b4fd5a82fe80e97e42766dbba46c18fd0170cbd64bb4e75fab56caa" },
+    { "name": "api-gateway", "key": "apiGateway", "refEnv": "GATEWAY_REF", "revision": "a493a668fa1f384512a04d41418d1d50ae0dff42", "digest": "sha256:640126c61ccb8edfe2bbf58ab18f07f68b57941efab0661768b81f861a861a6d" },
+    { "name": "orders-service", "key": "orders", "refEnv": "ORDERS_REF", "revision": "cbd07e32040565849997f13538256bf6c76c00e2", "digest": "sha256:b908aa475f5a0f4899f247a6aa665add16d0380f5a59ef23768dc2e52dab98d4" },
+    { "name": "inventory-service", "key": "inventory", "refEnv": "INVENTORY_REF", "revision": "b70de98d24fbe870bc046c6466f4e1757e6680ff", "digest": "sha256:1614fc6b794032c9f1a1823e718f388d0e3d3994f2b481200a8fa7c96bb6c439" },
+    { "name": "notifications-service", "key": "notifications", "refEnv": "NOTIFICATIONS_REF", "revision": "5aa62c1f4aa28ecd8fcda74de95dc367b505b21a", "digest": "sha256:a708d5856942347d40ea28ab1833142662a99dc5e18145f7c908683f6d44d08e" }
   ]
 }

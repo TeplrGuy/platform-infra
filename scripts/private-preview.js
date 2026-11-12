@@ -37,7 +37,7 @@ function images(refs) {
   const keys = ['portal', 'apiGateway', 'orders', 'inventory', 'notifications'];
   const names = ['portal-web', 'api-gateway', 'orders-service', 'inventory-service', 'notifications-service'];
   const refNames = ['PORTAL_REF', 'GATEWAY_REF', 'ORDERS_REF', 'INVENTORY_REF', 'NOTIFICATIONS_REF'];
-  if (release.publisherRun !== '43133264052' || release.services.length !== 5) throw Error('Image provenance is incomplete.');
+  if (release.publisherRun !== '43311421332' || release.services.length !== 5) throw Error('Image provenance is incomplete.');
   return Object.fromEntries(release.services.map((service, i) => {
     if (service.key !== keys[i] || service.name !== names[i] || service.refEnv !== refNames[i] ||
         !/^[a-f0-9]{40}$/.test(service.revision) || refs[service.refEnv] !== service.revision ||

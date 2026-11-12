@@ -17,7 +17,7 @@ const entraSecretId = `${vaultId}/secrets/entra-client-secret`;
 const refNames = ['PORTAL_REF', 'GATEWAY_REF', 'ORDERS_REF', 'INVENTORY_REF', 'NOTIFICATIONS_REF'];
 
 function images(refs) {
-  if (release.publisherRun !== '43133264052' || release.services.length !== 5) {
+  if (release.publisherRun !== '43311421332' || release.services.length !== 5) {
     throw new Error('Public promotion requires the complete pinned private release.');
   }
   return Object.fromEntries(release.services.map((service, index) => {
