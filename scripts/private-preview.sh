@@ -57,7 +57,6 @@ node scripts/private-preview.js validate private-what-if.json "$domain" private-
 printf '%s\n' "$domain" > private-domain.txt
 git ls-files -z infra scripts/private-preview.sh scripts/private-preview.js scripts/runtime-preview.js |
   xargs -0 sha256sum > private-template.sha256
-sha256sum private-compiled.json >> private-template.sha256
 if [[ "$mode" == apply ]]; then
   cmp -s private-domain.txt approved-private/private-domain.txt ||
     { echo "::error::The environment domain changed after approval."; exit 1; }

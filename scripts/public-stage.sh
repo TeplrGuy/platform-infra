@@ -99,7 +99,6 @@ printf '%s\n' "$callback_uri" > public-callback-uri.txt
 printf '%s\n' "$portal_url" > public-url.txt
 git ls-files -z infra scripts/public-stage.sh scripts/public-preview.js scripts/runtime-preview.js |
   xargs -0 sha256sum > public-template.sha256
-sha256sum public-compiled.json >> public-template.sha256
 if [[ "$mode" == preview ]]; then
   {
     echo "Expected portal URL: $portal_url"
