@@ -121,6 +121,14 @@ After quality gates, a second preview/approval/recheck deploys only the planned
 North Europe PostgreSQL, telemetry and Container Apps environment. It creates
 no application workloads, role grants or Entra registration. New runtime apply
 jobs use a non-canceling FIFO queue. The final application-release block remains.
+For the partial runtime deployment in run 43175062572, `runtime-recovery`
+previews and applies only the PostgreSQL extension setting and a new database
+URL secret. It checks that the existing server is ready with the expected
+administrator and reuses the recorded credential version; it refuses to
+overwrite an existing database URL. It never redeploys the server or database.
+`infra/private-workloads.bicep` is an unconnected private-only workload
+template, not an enabled release path; reviewed digest provenance, protected
+promotion and in-environment health gates are still required.
 The test, production, and rollback workflows remain blocked and must be
 adapted to resource-group-scope deployment and verified before enabling them.
 `infra/rg-rbac-condition.txt` is a proposed Azure RBAC condition for scoped

@@ -33,12 +33,15 @@ function requireValue(actual, expected, message) {
 }
 
 function validate(preview, stage) {
-  if (!['secrets', 'core'].includes(stage)) throw new Error('Unknown runtime preview stage.');
+  if (!['secrets', 'core', 'recovery'].includes(stage)) throw new Error('Unknown runtime preview stage.');
   if (preview?.status !== 'Succeeded' || !Array.isArray(preview.changes)) {
     throw new Error('Runtime preview did not succeed or is incomplete.');
   }
   const expected = new Map((stage === 'secrets' ? [
     [credential, 'Microsoft.KeyVault/vaults/secrets']
+  ] : stage === 'recovery' ? [
+    [`${pg}/configurations/azure.extensions`, 'Microsoft.DBforPostgreSQL/flexibleServers/configurations'],
+    [databaseUrl, 'Microsoft.KeyVault/vaults/secrets']
   ] : [
     [pg, 'Microsoft.DBforPostgreSQL/flexibleServers'],
     [`${pg}/databases/agenticsdldemo`, 'Microsoft.DBforPostgreSQL/flexibleServers/databases'],
@@ -65,6 +68,9 @@ function validate(preview, stage) {
     }
     if (stage === 'secrets' && change.changeType !== 'Create') {
       throw new Error('An existing database credential must never be overwritten.');
+    }
+    if (stage === 'recovery' && id === databaseUrl.toLowerCase() && change.changeType !== 'Create') {
+      throw new Error('An existing database URL must not be overwritten during recovery.');
     }
     const after = change.after;
     const props = after.properties ?? (id === `${pg}/databases/agenticsdldemo`.toLowerCase() ? {} : undefined);
@@ -128,7 +134,7 @@ if (require.main === module) {
       console.log(JSON.stringify(sanitize(JSON.parse(readFileSync(0, 'utf8')), process.env.POSTGRES_ADMIN_PASSWORD), null, 2));
     } else {
       const read = path => JSON.parse(readFileSync(path, 'utf8'));
-      if (!file || !['core', 'secrets'].includes(mode)) throw new Error('Usage: runtime-preview.js <core|secrets> <preview> [approved-preview], or sanitize on stdin.');
+      if (!file || !['core', 'secrets', 'recovery'].includes(mode)) throw new Error('Usage: runtime-preview.js <core|secrets|recovery> <preview> [approved-preview], or sanitize on stdin.');
       if (approved) validateAgainst(read(file), mode, read(approved));
       else validate(read(file), mode);
       console.log(`Runtime ${mode} preview matches the approved scope.`);

@@ -106,6 +106,37 @@ test('runtime prerequisites contain no workloads or role grants and never expose
   assert.equal(secrets[0].type, 'Microsoft.KeyVault/vaults/secrets');
   assert.equal(secrets[0].properties.value, "[parameters('postgresAdminPassword')]");
   assert.equal(Object.keys(seed.outputs || {}).length, 0);
+  const pgModule = Object.values(template.resources.postgres.properties.template.resources);
+  const firewall = pgModule.find(resource => resource.type.endsWith('/firewallRules'));
+  const extensions = pgModule.find(resource => resource.type.endsWith('/configurations'));
+  assert.ok(firewall.dependsOn.some(dependency => dependency.includes('flexibleServers/databases')));
+  assert.ok(extensions.dependsOn.some(dependency => dependency.includes('flexibleServers/firewallRules')));
+  const recovery = getTemplate('infra/runtime-recovery.bicep');
+  assert.equal(recovery.parameters.postgresAdminPassword.type.toLowerCase(), 'securestring');
+  const recoveryResources = Object.values(recovery.resources);
+  assert.deepEqual(recoveryResources.map(resource => resource.type).sort(),
+    ['Microsoft.DBforPostgreSQL/flexibleServers/configurations', 'Microsoft.Resources/deployments']);
+  const recoverySecrets = recoveryResources.find(resource => resource.type === 'Microsoft.Resources/deployments');
+  assert.equal(recoverySecrets.properties.parameters.enableEntraAuth.value, false);
+  assert.equal(Object.keys(recovery.outputs || {}).length, 0);
+});
+
+test('private workload template cannot enable public ingress or change foundation resources', () => {
+  const template = getTemplate('infra/private-workloads.bicep');
+  const modules = Object.values(template.resources);
+  assert.equal(modules.length, 1);
+  const apps = modules[0];
+  assert.equal(apps.name, 'private-workloads');
+  assert.equal(apps.properties.parameters.enablePublicIngress.value, false);
+  assert.equal(apps.properties.parameters.enableEntraAuth.value, false);
+  assert.equal(apps.properties.parameters.isPlaceholder.value, false);
+  assert.equal(apps.properties.parameters.containerImages.value, "[parameters('containerImages')]");
+  assert.deepEqual(Object.keys(template.outputs), ['appNames']);
+  const resources = Object.values(apps.properties.template.resources);
+  assert.deepEqual(resources.map(resource => resource.type).sort(),
+    ['Microsoft.App/containerApps', 'Microsoft.App/containerApps/authConfigs']);
+  const auth = resources.find(resource => resource.type === 'Microsoft.App/containerApps/authConfigs');
+  assert.equal(auth.condition, "[and(not(parameters('isPlaceholder')), parameters('enableEntraAuth'))]");
 });
 
 test('application identities and access exist before the apps that use them', () => {

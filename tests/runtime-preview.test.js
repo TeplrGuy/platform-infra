@@ -93,6 +93,19 @@ test('credential seeding rejects overwrite, deletion and any other secret', () =
   assert.throws(() => validate(preview, 'secrets'));
 });
 
+test('runtime recovery changes only extensions and a new database URL', () => {
+  const preview = core();
+  preview.changes = [preview.changes[2], preview.changes[7]];
+  preview.changes[0].changeType = 'Modify';
+  assert.doesNotThrow(() => validate(preview, 'recovery'));
+  const overwrite = structuredClone(preview);
+  overwrite.changes[1].changeType = 'Modify';
+  assert.throws(() => validate(overwrite, 'recovery'), /must not be overwritten/);
+  const unexpected = structuredClone(preview);
+  unexpected.changes.push(core().changes[0]);
+  assert.throws(() => validate(unexpected, 'recovery'));
+});
+
 test('stored previews redact credentials, vault values and telemetry keys without hiding security settings', () => {
   const password = 'Aa0_TestCredential55eb0123456789';
   const input = {

@@ -56,6 +56,7 @@ on:
           - access-apply
           - publish-images
           - runtime-apply
+          - runtime-recovery
 
 permissions:
   contents: read
@@ -799,6 +800,78 @@ jobs:
             runtime-template.sha256
             runtime-credential-id.txt
             runtime-outputs.json
+          if-no-files-found: warn
+  preview-runtime-recovery:
+    if: ${{ inputs.foundation_action == 'runtime-recovery' }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview the missing extension and database URL only
+        run: bash scripts/runtime-stage.sh recovery-preview
+      - name: Preserve the redacted recovery preview
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: runtime-recovery-preview-${{ github.run_id }}
+          path: |
+            runtime-audit.log
+            runtime-what-if.json
+            runtime-template.sha256
+            runtime-credential-id.txt
+          if-no-files-found: warn
+  apply-runtime-recovery:
+    if: ${{ inputs.foundation_action == 'runtime-recovery' }}
+    needs: [preview-runtime-recovery]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 25
+    concurrency:
+      group: agentsdlc-dev-55eb-runtime-apply
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: runtime-recovery-preview-${{ github.run_id }}
+          path: approved-runtime
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck and apply the scoped runtime recovery
+        run: bash scripts/runtime-stage.sh recovery-apply
+      - name: Preserve runtime recovery evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: runtime-recovery-apply-${{ github.run_id }}
+          path: |
+            runtime-audit.log
+            runtime-what-if.json
+            runtime-template.sha256
+            runtime-credential-id.txt
           if-no-files-found: warn
   block-unsafe-release:
     if: ${{ !inputs.bootstrap_rg }}

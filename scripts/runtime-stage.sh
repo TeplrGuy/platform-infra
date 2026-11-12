@@ -63,7 +63,7 @@ load_password() {
     echo "::error::The database credential version is unresolved."
     exit 1
   }
-  if [[ "$mode" == core-apply ]]; then
+  if [[ "$mode" == core-apply || "$mode" == recovery-apply ]]; then
     [[ "$id" == "$(cat approved-runtime/runtime-credential-id.txt)" ]] || {
       echo "::error::The database credential version changed after approval."
       exit 1
@@ -132,6 +132,20 @@ case "$mode" in
       apply core infra/runtime-foundation.bicepparam
       azure runtime-outputs deployment group show --name "runtime-core-$GITHUB_RUN_ID" \
         --resource-group agtsdlc-dev-rg --query properties.outputs --output json > runtime-outputs.json
+    fi
+    ;;
+  recovery-preview|recovery-apply)
+    load_password
+    azure server-discovery postgres flexible-server show --resource-group agtsdlc-dev-rg \
+      --name pg-agentsdlc-dev-55eb --query '{state:state,administratorLogin:administratorLogin,version:version}' --output json |
+      node -e 'let s=""; process.stdin.on("data", c => s+=c).on("end", () => {
+        const p=JSON.parse(s);
+        if (p.state !== "Ready" || p.administratorLogin !== "agenticsadmin" || p.version !== "16")
+          throw Error("Existing PostgreSQL state, administrator, or version is unexpected.");
+      });'
+    preview recovery infra/runtime-recovery.bicepparam
+    if [[ "$mode" == recovery-apply ]]; then
+      apply recovery infra/runtime-recovery.bicepparam
     fi
     ;;
   *)

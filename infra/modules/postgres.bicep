@@ -28,11 +28,17 @@ resource server 'Microsoft.DBforPostgreSQL/flexibleServers@2026-10-01' = {
 resource firewall 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = {
   parent: server
   name: 'AllowAllAzureServicesAndResourcesWithinAzureIps'
+  dependsOn: [
+    database
+  ]
   properties: { startIpAddress: '0.0.0.0', endIpAddress: '0.0.0.0' }
 }
 resource extensions 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = {
   parent: server
   name: 'azure.extensions'
+  dependsOn: [
+    firewall
+  ]
   properties: { value: 'uuid-ossp,pgcrypto,pg_trgm', source: 'user-override' }
 }
 resource database 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-01' = {
