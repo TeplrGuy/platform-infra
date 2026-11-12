@@ -667,6 +667,7 @@ jobs:
           if-no-files-found: warn
   preview-runtime-credentials:
     if: ${{ inputs.foundation_action == 'runtime-apply' }}
+    needs: [validate-bicep, quality]
     runs-on: ubuntu-24.04
     environment: dev
     timeout-minutes: 15
@@ -695,6 +696,15 @@ jobs:
       - id: preview
         name: Preview the one-time credential seed or verify reuse
         run: bash scripts/runtime-stage.sh secrets-preview
+      - name: Prepare approved runtime credential preview for in-job apply
+        if: ${{ steps.preview.outputs.seed_required == 'true' }}
+        run: |
+          mkdir -p approved-runtime
+          cp runtime-what-if.json approved-runtime/runtime-what-if.json
+          cp runtime-template.sha256 approved-runtime/runtime-template.sha256
+      - name: Recheck and persist the administrator credential through IaC
+        if: ${{ steps.preview.outputs.seed_required == 'true' }}
+        run: bash scripts/runtime-stage.sh secrets-apply
       - name: Restore Key Vault private-only access
         if: always()
         run: |
@@ -713,63 +723,9 @@ jobs:
             runtime-what-if.json
             runtime-template.sha256
           if-no-files-found: warn
-  seed-runtime-credentials:
-    if: ${{ inputs.foundation_action == 'runtime-apply' && needs.preview-runtime-credentials.outputs.seed_required == 'true' }}
-    needs: [preview-runtime-credentials, validate-bicep, quality]
-    runs-on: ubuntu-24.04
-    environment: dev
-    timeout-minutes: 15
-    concurrency:
-      group: agentsdlc-dev-7c77-runtime-apply
-      cancel-in-progress: false
-      queue: max
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '24'
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: runtime-credentials-preview-${{ github.run_id }}
-          path: approved-runtime
-      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Enable Key Vault public access for runtime credential apply
-        run: |
-          az keyvault update \
-            --name kv-agentsdlc-dev-7c77 \
-            --resource-group agtsdlc-dev-rg \
-            --public-network-access Enabled \
-            --only-show-errors --output none
-      - name: Recheck and persist the administrator credential through IaC
-        run: bash scripts/runtime-stage.sh secrets-apply
-      - name: Restore Key Vault private-only access
-        if: always()
-        run: |
-          az keyvault update \
-            --name kv-agentsdlc-dev-7c77 \
-            --resource-group agtsdlc-dev-rg \
-            --public-network-access Disabled \
-            --only-show-errors --output none
-      - name: Preserve credential seed audit without credential values
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: runtime-credentials-apply-${{ github.run_id }}
-          path: |
-            runtime-audit.log
-            runtime-what-if.json
-            runtime-template.sha256
-          if-no-files-found: warn
   preview-runtime:
-    if: ${{ always() && inputs.foundation_action == 'runtime-apply' && needs.preview-runtime-credentials.result == 'success' && (needs.seed-runtime-credentials.result == 'success' || needs.seed-runtime-credentials.result == 'skipped') && needs.validate-bicep.result == 'success' && needs.quality.result == 'success' }}
-    needs: [preview-runtime-credentials, seed-runtime-credentials, validate-bicep, quality]
+    if: ${{ always() && inputs.foundation_action == 'runtime-apply' && needs.preview-runtime-credentials.result == 'success' && needs.validate-bicep.result == 'success' && needs.quality.result == 'success' }}
+    needs: [preview-runtime-credentials, validate-bicep, quality]
     runs-on: ubuntu-24.04
     environment: dev
     timeout-minutes: 20
