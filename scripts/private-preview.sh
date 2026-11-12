@@ -40,12 +40,18 @@ environment="$(azure environment resource show --ids "$environment_id" --api-ver
   --query '{state:properties.provisioningState,domain:properties.defaultDomain}' --output json)"
 [[ "$(jq -r '.state' <<< "$environment")" == Succeeded ]] || { echo "::error::Runtime environment is not ready."; exit 1; }
 domain="$(jq -er '.domain' <<< "$environment")"
+registry_server="$(azure registry resource show --ids "/subscriptions/8fcc5e8e-6540-4288-89e7-849e94290205/resourceGroups/agtsdlc-dev-rg/providers/Microsoft.ContainerRegistry/registries/cragentsdlcdev55eb" --api-version 2025-11-01 --query properties.loginServer --output tsv)"
+vault_uri="$(azure vault resource show --ids "/subscriptions/8fcc5e8e-6540-4288-89e-849e94290205/resourceGroups/agtsdlc-dev-rg/providers/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb" --api-version 2026-05-15 --query properties.vaultUri --output tsv)"
+[[ "$registry_server" == cragentsdlcdev55eb.azurecr.io && "$vault_uri" == https://kv-agentsdlc-dev-55eb.vault.azure.net/ ]] ||
+  { echo "::error::Registry or vault endpoint differs from the approved target."; exit 1; }
 node scripts/private-preview.js parameters > private-parameters.json
+az bicep build --file infra/private-workloads.bicep --stdout > private-compiled.json
 azure private-what-if deployment group what-if --name "private-preview-$GITHUB_RUN_ID" \
-  --resource-group agtsdlc-dev-rg --template-file infra/private-workloads.bicep \
+  --resource-group agtsdlc-dev-rg --template-file private-compiled.json \
   --parameters @private-parameters.json --no-pretty-print --no-prompt --output json |
   node scripts/runtime-preview.js sanitize > private-what-if.json
-node scripts/private-preview.js validate private-what-if.json "$domain"
+node scripts/private-preview.js validate private-what-if.json "$domain" private-compiled.json
 printf '%s\n' "$domain" > private-domain.txt
 git ls-files -z infra scripts/private-preview.sh scripts/private-preview.js scripts/runtime-preview.js |
   xargs -0 sha256sum > private-template.sha256
+sha256sum private-compiled.json >> private-template.sha256

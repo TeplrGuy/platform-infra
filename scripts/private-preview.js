@@ -1,4 +1,5 @@
 const { readFileSync } = require('node:fs');
+const { createHash } = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
 const release = require('../infra/private-release.json');
 const foundation = require('../infra/foundation.parameters.json').parameters;
@@ -7,6 +8,30 @@ const root = '/subscriptions/8fcc5e8e-6540-4288-89e7-849e94290205/resourceGroups
 const registry = 'cragentsdlcdev55eb.azurecr.io';
 const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb`;
 const vaultSecret = 'https://kv-agentsdlc-dev-55eb.vault.azure.net/secrets/postgres-database-url';
+const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb`;
+const registryId = `${root}Microsoft.ContainerRegistry/registries/cragentsdlcdev55eb`;
+
+function validateTemplate(template) {
+  const modules = Object.values(template?.resources || {});
+  const module = modules.find(resource => resource.name === 'private-workloads');
+  const nested = module?.properties?.template;
+  const apps = Object.values(nested?.resources || {}).find(resource => resource.type === 'Microsoft.App/containerApps');
+  const params = module?.properties?.parameters;
+  const resourceNames = require('../infra/main.parameters.json').parameters.resourceNames.value;
+  const hash = value => typeof value === 'string' ? createHash('sha256').update(value).digest('hex') : '';
+  // Azure masks secret names: pin both compiled expressions, not merely the masked preview.
+  if (modules.length !== 1 || !apps || params?.isPlaceholder?.value !== false ||
+      params.enablePublicIngress?.value !== false || params.enableEntraAuth?.value !== false ||
+      params.appInsightsConnectionString?.value !== "[reference(resourceId('Microsoft.Insights/components', variables('names').appInsights), '2020-02-02').ConnectionString]" ||
+      template.variables?.names !== "[variables('$fxv#0').parameters.resourceNames.value]" ||
+      !isDeepStrictEqual(template.variables?.['$fxv#0']?.parameters?.resourceNames?.value, resourceNames) ||
+      resourceNames.appInsights !== 'appi-agentsdlc-dev-55eb' ||
+      nested.variables?.databaseUrlSecret !== 'postgres-database-url' ||
+      hash(apps.properties?.configuration?.secrets) !== '0d83a39080e111b8a1a26b4a0bdba68e913c875d6b02c8cea52d7bfb479e5490' ||
+      hash(apps.properties?.template?.containers?.[0]?.env) !== '1668e956400eaf480d7c736d54f138b04d59d5ee41e63a2e4d4cb0f31f741747') {
+    throw Error('Compiled secret and environment bindings differ from the reviewed template.');
+  }
+}
 
 function images(refs) {
   const keys = ['portal', 'apiGateway', 'orders', 'inventory', 'notifications'];
@@ -23,7 +48,8 @@ function images(refs) {
   }));
 }
 
-function validate(preview, domain, refs) {
+function validate(preview, domain, refs, template) {
+  validateTemplate(template);
   const expectedImages = images(refs);
   if (!/^[a-z0-9-]+\.northeurope\.azurecontainerapps\.io$/.test(domain)) throw Error('Unexpected environment domain.');
   if (preview?.status !== 'Succeeded' || !Array.isArray(preview.changes)) throw Error('Preview is incomplete.');
@@ -56,7 +82,7 @@ function validate(preview, domain, refs) {
     const config = properties.configuration;
     if (config?.ingress?.external !== false || config.ingress.targetPort !== 3000 || config.ingress.transport !== 'auto' ||
         config.activeRevisionsMode !== 'Single' || config.registries?.length !== 1 ||
-        config.registries[0].server !== registry ||
+        ![registry, `[reference('${registryId}', '2025-11-01').loginServer]`].includes(config.registries[0].server) ||
         config.registries[0].identity?.toLowerCase() !== identity.toLowerCase()) {
       throw Error('Ingress or registry identity is not private and scoped.');
     }
@@ -81,7 +107,9 @@ function validate(preview, domain, refs) {
       {}
     ][i];
     for (const [key, target] of Object.entries(urls)) {
-      if (vars.get(key)?.value !== `https://${names[target]}.internal.${domain}`) throw Error('Internal service URL differs from the plan.');
+      const literal = `https://${names[target]}.internal.${domain}`;
+      const reference = `[concat('https://', '${names[target]}', '.internal.', reference('${environmentId}', '2026-07-01').defaultDomain)]`;
+      if (![literal, reference].includes(vars.get(key)?.value)) throw Error('Internal service URL differs from the plan.');
     }
     const db = i >= 2;
     const expectedVars = ['PORT', 'ENVIRONMENT_NAME', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'OTEL_SERVICE_NAME',
@@ -92,8 +120,9 @@ function validate(preview, domain, refs) {
     }
     const secrets = config.secrets || [];
     if (db) {
-      if (vars.get('DATABASE_URL')?.secretRef !== 'postgres-database-url' || secrets.length !== 1 ||
-          secrets[0].name !== 'postgres-database-url' || secrets[0].keyVaultUrl !== vaultSecret ||
+      const vaultReference = `[concat(reference('${vaultId}', '2026-05-15').vaultUri, 'secrets/', 'postgres-database-url')]`;
+      if (!['postgres-database-url', '*******'].includes(vars.get('DATABASE_URL')?.secretRef) || secrets.length !== 1 ||
+          !['postgres-database-url', '*******'].includes(secrets[0].name) || ![vaultSecret, vaultReference].includes(secrets[0].keyVaultUrl) ||
           secrets[0].identity?.toLowerCase() !== identity.toLowerCase()) throw Error('Database secret reference is invalid.');
     } else if (secrets.length || vars.has('DATABASE_URL')) {
       throw Error('Unexpected database secret access.');
@@ -110,15 +139,15 @@ function validate(preview, domain, refs) {
 
 if (require.main === module) {
   try {
-    const [mode, file, domain] = process.argv.slice(2);
+    const [mode, file, domain, templateFile] = process.argv.slice(2);
     if (mode === 'parameters') {
       console.log(JSON.stringify({ $schema: 'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#',
         contentVersion: '1.0.0.0', parameters: { containerImages: { value: images(process.env) } } }, null, 2));
-    } else if (mode === 'validate' && file && domain) {
-      validate(JSON.parse(readFileSync(file, 'utf8')), domain, process.env);
+    } else if (mode === 'validate' && file && domain && templateFile) {
+      validate(JSON.parse(readFileSync(file, 'utf8')), domain, process.env, JSON.parse(readFileSync(templateFile, 'utf8')));
       console.log('Private workload preview matches the pinned images and approved scope.');
     } else {
-      throw Error('Usage: private-preview.js parameters | validate <file> <domain>');
+      throw Error('Usage: private-preview.js parameters | validate <file> <domain> <compiled-template>');
     }
   } catch (error) {
     console.error(`::error::${error.message}`);
@@ -126,4 +155,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { images, validate };
+module.exports = { images, validate, validateTemplate };

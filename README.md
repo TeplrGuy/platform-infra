@@ -130,7 +130,12 @@ overwrite an existing database URL. It never redeploys the server or database.
 internal workloads using the exact source revisions and registry digests from
 publisher run 43133264052. It verifies private ingress, scoped identities,
 image digests, service URLs and database secret references, and redacts telemetry
-credentials before storing the preview. It does not deploy workloads;
+credentials before storing the preview. Azure may return unresolved resource
+references and mask secret names: the validator accepts only the exact scoped
+references and checks the compiled secret and environment expressions against
+reviewed hashes. Intentional changes to those expressions require reviewing and
+updating the hashes. The workflow checks the live registry and vault endpoints
+and uses the same compiled template for its what-if. It does not deploy workloads;
 protected promotion and in-environment health gates are still required.
 The test, production, and rollback workflows remain blocked and must be
 adapted to resource-group-scope deployment and verified before enabling them.
