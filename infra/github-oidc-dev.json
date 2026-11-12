@@ -1,0 +1,9 @@
+{
+  "name": "github-dev-environment",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:TeplrGuy/platform-infra:environment:dev",
+  "description": "GitHub Actions federation for the protected dev environment.",
+  "audiences": [
+    "api://AzureADTokenExchange"
+  ]
+}

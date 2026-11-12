@@ -2,40 +2,1228 @@ name: deploy-dev
 
 on:
   workflow_dispatch:
-
-concurrency:
-  group: deploy-dev-${{ github.ref }}
-  cancel-in-progress: false
+    inputs:
+      portal_ref:
+        description: Portal commit SHA
+        required: true
+        type: string
+      gateway_ref:
+        description: Gateway commit SHA
+        required: true
+        type: string
+      orders_ref:
+        description: Orders commit SHA
+        required: true
+        type: string
+      inventory_ref:
+        description: Inventory commit SHA
+        required: true
+        type: string
+      notifications_ref:
+        description: Notifications commit SHA
+        required: true
+        type: string
+      verify_oidc:
+        description: Request a protected, non-deploying Azure OIDC sign-in check
+        required: true
+        default: false
+        type: boolean
+      preview_bootstrap:
+        description: Preview the resource group bootstrap without deploying
+        required: true
+        default: false
+        type: boolean
+      bootstrap_rg:
+        description: Create only the approved dev resource group after protected preview and approval
+        required: true
+        default: false
+        type: boolean
+      preserve_images:
+        description: Preserve the built and smoke-tested images without publishing them
+        required: true
+        default: false
+        type: boolean
+      foundation_action:
+        description: Preview or apply only the approved registry and vault foundation
+        required: true
+        default: none
+        type: choice
+        options:
+          - none
+          - preview
+          - apply
+          - access-preview
+          - access-apply
+          - publish-images
+          - runtime-apply
+          - runtime-recovery
+          - private-preview
+          - private-apply
+          - public-preview
+          - public-apply
+          - health-preview
+          - health-apply
+          - health-run
+          - journey-run
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
-  block-unsafe-release:
-    runs-on: ubuntu-latest
-    permissions: {}
-    steps:
-      - run: |
-          echo "::error::Disabled: the template still deploys placeholder images. Implement and verify immutable application releases before enabling this workflow."
-          exit 1
-  deploy:
-    needs: block-unsafe-release
+  preview-foundation:
+    if: ${{ inputs.foundation_action == 'preview' || inputs.foundation_action == 'apply' }}
     runs-on: ubuntu-latest
     environment: dev
-    timeout-minutes: 20
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: azure/login@v2
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - uses: azure/cli@v2
+      - name: Preview the resource-group foundation
+        env:
+          DEPLOYER_OBJECT_ID: ${{ vars.AZURE_DEPLOYER_OBJECT_ID }}
+          TARGET_CLIENT: ${{ vars.AZURE_CLIENT_ID }}
+          TARGET_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TARGET_TENANT: ${{ vars.AZURE_TENANT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$DEPLOYER_OBJECT_ID" != "b6a3c39d-0263-4f01-b975-654cdea443a0" ||
+                "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
+                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
+                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+            echo "::error::The identity, tenant, or subscription does not match the approved target."
+            exit 1
+          fi
+          echo "started foundation what-if run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee foundation-audit.log
+          if az deployment group what-if \
+            --name "foundation-preview-$GITHUB_RUN_ID" \
+            --resource-group agtsdlc-dev-rg \
+            --template-file infra/foundation.bicep \
+            --parameters infra/foundation.parameters.json deployerObjectId="$DEPLOYER_OBJECT_ID" \
+            --no-pretty-print --no-prompt --output json > foundation-what-if.json; then
+            echo "succeeded foundation what-if" | tee -a foundation-audit.log
+          else
+            code=$?
+            echo "failed foundation what-if exit=$code" | tee -a foundation-audit.log
+            exit "$code"
+          fi
+          if node scripts/validate-foundation-preview.js foundation-what-if.json; then
+            echo "succeeded foundation preview completeness check" | tee -a foundation-audit.log
+          else
+            echo "failed foundation preview completeness check" | tee -a foundation-audit.log
+            exit 1
+          fi
+      - name: Preserve foundation preview
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          inlineScript: |
-            az deployment sub create \
-              --name platform-dev-${{ github.run_id }} \
-              --location northeurope \
-              --template-file infra/main.bicep \
-              --parameters infra/main.dev.bicepparam
+          name: foundation-preview-${{ github.run_id }}
+          path: |
+            foundation-audit.log
+            foundation-what-if.json
+          if-no-files-found: warn
+  preview-foundation-access:
+    if: ${{ inputs.foundation_action == 'access-preview' || inputs.foundation_action == 'access-apply' }}
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview application identity access
+        env:
+          TARGET_CLIENT: ${{ vars.AZURE_CLIENT_ID }}
+          TARGET_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TARGET_TENANT: ${{ vars.AZURE_TENANT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
+                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
+                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+            echo "::error::The identity, tenant, or subscription does not match the approved target."
+            exit 1
+          fi
+          echo "started identity discovery run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee access-preview-audit.log
+          ids=()
+          for name in portal apigw orders inventory notify; do
+            if principal="$(az identity show --subscription "$TARGET_SUBSCRIPTION" \
+              --resource-group agtsdlc-dev-rg --name "ca-agentsdlc-dev-55eb-$name-identity" \
+              --query principalId --output tsv)"; then
+              ids+=("$principal")
+            else
+              echo "failed identity discovery for $name" | tee -a access-preview-audit.log
+              exit 1
+            fi
+          done
+          echo "succeeded identity discovery" | tee -a access-preview-audit.log
+          node scripts/foundation-access-parameters.js "${ids[@]}" > foundation-access-parameters.json
+          echo "started access what-if run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee -a access-preview-audit.log
+          if az deployment group what-if \
+            --name "foundation-access-preview-$GITHUB_RUN_ID" \
+            --resource-group agtsdlc-dev-rg \
+            --template-file infra/foundation-access.bicep \
+            --parameters @foundation-access-parameters.json \
+            --no-pretty-print --no-prompt --output json > foundation-access-what-if.json; then
+            echo "succeeded access what-if" | tee -a access-preview-audit.log
+          else
+            code=$?
+            echo "failed access what-if exit=$code" | tee -a access-preview-audit.log
+            exit "$code"
+          fi
+          if node scripts/validate-foundation-access-preview.js foundation-access-what-if.json foundation-access-parameters.json; then
+            echo "succeeded access preview validation" | tee -a access-preview-audit.log
+          else
+            echo "failed access preview validation" | tee -a access-preview-audit.log
+            exit 1
+          fi
+      - name: Preserve access preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundation-access-preview-${{ github.run_id }}
+          path: |
+            access-preview-audit.log
+            foundation-access-parameters.json
+            foundation-access-what-if.json
+          if-no-files-found: warn
+  preview-bootstrap:
+    if: ${{ inputs.preview_bootstrap || inputs.bootstrap_rg }}
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview the resource group
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "started bootstrap what-if run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee deploy-audit.log
+          if az deployment sub what-if \
+            --name "rg-bootstrap-preview-$GITHUB_RUN_ID" \
+            --location northeurope \
+            --template-file infra/bootstrap-rg.bicep \
+            --no-pretty-print --no-prompt --output json > bootstrap-what-if.json; then
+            echo "succeeded bootstrap what-if" | tee -a deploy-audit.log
+          else
+            code=$?
+            echo "failed bootstrap what-if exit=$code" | tee -a deploy-audit.log
+            exit "$code"
+          fi
+          node scripts/validate-rg-preview.js bootstrap-what-if.json
+      - name: Preserve preview and audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bootstrap-preview-${{ github.run_id }}
+          path: |
+            deploy-audit.log
+            bootstrap-what-if.json
+          if-no-files-found: warn
+  verify-identity:
+    if: ${{ inputs.verify_oidc }}
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Verify the token tenant
+        env:
+          EXPECTED_TENANT: ${{ vars.AZURE_TENANT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tenant="$(az account get-access-token --resource https://management.azure.com/ --query tenant -o tsv)"
+          if [[ -z "$EXPECTED_TENANT" || "$tenant" != "$EXPECTED_TENANT" ]]; then
+            echo "::error::Azure token tenant does not match the configured tenant."
+            exit 1
+          fi
+          echo "OIDC sign-in succeeded. No Azure resource or RBAC changes were made."
+  validate-inputs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PORTAL_REF: ${{ inputs.portal_ref }}
+      GATEWAY_REF: ${{ inputs.gateway_ref }}
+      ORDERS_REF: ${{ inputs.orders_ref }}
+      INVENTORY_REF: ${{ inputs.inventory_ref }}
+      NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+      FOUNDATION_ACTION: ${{ inputs.foundation_action }}
+      BOOTSTRAP_RG: ${{ inputs.bootstrap_rg }}
+      PRESERVE_IMAGES: ${{ inputs.preserve_images }}
+    steps:
+      - name: Require immutable application revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$FOUNDATION_ACTION" != "none" && "$BOOTSTRAP_RG" == "true" ]]; then
+            echo "::error::Foundation work and resource-group bootstrap cannot run together."
+            exit 1
+          fi
+          if [[ "$FOUNDATION_ACTION" == "publish-images" && "$PRESERVE_IMAGES" != "true" ]]; then
+            echo "::error::Image publication requires preserving the quality-gated images."
+            exit 1
+          fi
+          for ref in "$PORTAL_REF" "$GATEWAY_REF" "$ORDERS_REF" "$INVENTORY_REF" "$NOTIFICATIONS_REF"; do
+            if [[ ! "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Each application revision must be a full lowercase Git commit SHA."
+              exit 1
+            fi
+          done
+  validate-bicep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: bash -n scripts/public-stage.sh scripts/journey-stage.sh && node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js tests/verify-image-artifact.test.js tests/foundation-access-parameters.test.js tests/validate-foundation-access-preview.test.js tests/runtime-preview.test.js tests/private-preview.test.js tests/private-health.test.js tests/health-preview.test.js tests/private-journey.test.js tests/journey-stage.test.js tests/public-preview.test.js
+  quality:
+    needs: validate-inputs
+    uses: ./.github/workflows/full-stack-e2e.yml
+    with:
+      portal_ref: ${{ inputs.portal_ref }}
+      gateway_ref: ${{ inputs.gateway_ref }}
+      orders_ref: ${{ inputs.orders_ref }}
+      inventory_ref: ${{ inputs.inventory_ref }}
+      notifications_ref: ${{ inputs.notifications_ref }}
+      preserve_images: ${{ inputs.preserve_images }}
+  apply-foundation-access:
+    if: ${{ inputs.foundation_action == 'access-apply' && !inputs.bootstrap_rg }}
+    needs: [preview-foundation-access, validate-bicep, quality]
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: foundation-access-preview-${{ github.run_id }}
+          path: approved-access
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck and apply application identity access
+        env:
+          TARGET_CLIENT: ${{ vars.AZURE_CLIENT_ID }}
+          TARGET_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TARGET_TENANT: ${{ vars.AZURE_TENANT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
+                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
+                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+            echo "::error::The identity, tenant, or subscription does not match the approved target."
+            exit 1
+          fi
+          echo "started identity recheck run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee access-apply-audit.log
+          ids=()
+          for name in portal apigw orders inventory notify; do
+            if principal="$(az identity show --subscription "$TARGET_SUBSCRIPTION" \
+              --resource-group agtsdlc-dev-rg --name "ca-agentsdlc-dev-55eb-$name-identity" \
+              --query principalId --output tsv)"; then
+              ids+=("$principal")
+            else
+              echo "failed identity recheck for $name" | tee -a access-apply-audit.log
+              exit 1
+            fi
+          done
+          echo "succeeded identity recheck" | tee -a access-apply-audit.log
+          node scripts/foundation-access-parameters.js "${ids[@]}" > access-recheck-parameters.json
+          echo "started access recheck run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee -a access-apply-audit.log
+          if az deployment group what-if \
+            --name "foundation-access-recheck-$GITHUB_RUN_ID" \
+            --resource-group agtsdlc-dev-rg \
+            --template-file infra/foundation-access.bicep \
+            --parameters @access-recheck-parameters.json \
+            --no-pretty-print --no-prompt --output json > access-recheck.json; then
+            echo "succeeded access recheck" | tee -a access-apply-audit.log
+          else
+            code=$?
+            echo "failed access recheck exit=$code" | tee -a access-apply-audit.log
+            exit "$code"
+          fi
+          if node scripts/validate-foundation-access-preview.js access-recheck.json access-recheck-parameters.json \
+            approved-access/foundation-access-what-if.json approved-access/foundation-access-parameters.json; then
+            echo "succeeded access recheck comparison" | tee -a access-apply-audit.log
+          else
+            echo "failed access recheck comparison" | tee -a access-apply-audit.log
+            exit 1
+          fi
+          echo "started access apply run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee -a access-apply-audit.log
+          if az deployment group create \
+            --name "foundation-access-$GITHUB_RUN_ID" \
+            --resource-group agtsdlc-dev-rg \
+            --template-file infra/foundation-access.bicep \
+            --parameters @access-recheck-parameters.json \
+            --no-prompt --output json > access-result.json; then
+            echo "succeeded access apply" | tee -a access-apply-audit.log
+          else
+            code=$?
+            echo "failed access apply exit=$code" | tee -a access-apply-audit.log
+            exit "$code"
+          fi
+      - name: Preserve access apply evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundation-access-apply-${{ github.run_id }}
+          path: |
+            access-apply-audit.log
+            access-recheck-parameters.json
+            access-recheck.json
+            access-result.json
+          if-no-files-found: warn
+  apply-foundation:
+    if: ${{ inputs.foundation_action == 'apply' && !inputs.bootstrap_rg }}
+    needs: [preview-foundation, validate-bicep, quality]
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: foundation-preview-${{ github.run_id }}
+          path: approved-foundation
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck and apply the foundation only
+        env:
+          DEPLOYER_OBJECT_ID: ${{ vars.AZURE_DEPLOYER_OBJECT_ID }}
+          TARGET_CLIENT: ${{ vars.AZURE_CLIENT_ID }}
+          TARGET_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TARGET_TENANT: ${{ vars.AZURE_TENANT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$DEPLOYER_OBJECT_ID" != "b6a3c39d-0263-4f01-b975-654cdea443a0" ||
+                "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
+                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
+                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+            echo "::error::The identity, tenant, or subscription does not match the approved target."
+            exit 1
+          fi
+          echo "started foundation recheck run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee foundation-apply-audit.log
+          if az deployment group what-if \
+            --name "foundation-recheck-$GITHUB_RUN_ID" \
+            --resource-group agtsdlc-dev-rg \
+            --template-file infra/foundation.bicep \
+            --parameters infra/foundation.parameters.json deployerObjectId="$DEPLOYER_OBJECT_ID" \
+            --no-pretty-print --no-prompt --output json > foundation-recheck.json; then
+            echo "succeeded foundation recheck" | tee -a foundation-apply-audit.log
+          else
+            code=$?
+            echo "failed foundation recheck exit=$code" | tee -a foundation-apply-audit.log
+            exit "$code"
+          fi
+          if node scripts/validate-foundation-preview.js foundation-recheck.json approved-foundation/foundation-what-if.json; then
+            echo "succeeded foundation recheck comparison" | tee -a foundation-apply-audit.log
+          else
+            echo "failed foundation recheck comparison" | tee -a foundation-apply-audit.log
+            exit 1
+          fi
+          echo "started foundation apply run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee -a foundation-apply-audit.log
+          if az deployment group create \
+            --name "foundation-$GITHUB_RUN_ID" \
+            --resource-group agtsdlc-dev-rg \
+            --template-file infra/foundation.bicep \
+            --parameters infra/foundation.parameters.json deployerObjectId="$DEPLOYER_OBJECT_ID" \
+            --no-prompt --output json > foundation-result.json; then
+            echo "succeeded foundation apply" | tee -a foundation-apply-audit.log
+          else
+            code=$?
+            echo "failed foundation apply exit=$code" | tee -a foundation-apply-audit.log
+            exit "$code"
+          fi
+      - name: Preserve foundation apply evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundation-apply-${{ github.run_id }}
+          path: |
+            foundation-apply-audit.log
+            foundation-recheck.json
+            foundation-result.json
+          if-no-files-found: warn
+  publish-images:
+    if: ${{ inputs.foundation_action == 'publish-images' && inputs.preserve_images && !inputs.bootstrap_rg }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-images-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-images
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify and publish the exact quality-gated images
+        env:
+          TARGET_CLIENT: ${{ vars.AZURE_CLIENT_ID }}
+          TARGET_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TARGET_TENANT: ${{ vars.AZURE_TENANT_ID }}
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
+                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
+                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+            echo "::error::The identity, tenant, or subscription does not match the approved target."
+            exit 1
+          fi
+          node scripts/verify-image-artifact.js archive release-images "$GITHUB_RUN_ID"
+          docker image load --input release-images/images.tar.gz
+          node scripts/verify-image-artifact.js loaded release-images "$GITHUB_RUN_ID"
+          echo "started registry login run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee image-publish-audit.log
+          logged_in=false
+          for attempt in 1 2 3 4 5 6; do
+            if az acr login --name cragentsdlcdev55eb --subscription "$TARGET_SUBSCRIPTION"; then
+              logged_in=true
+              break
+            fi
+            echo "registry login attempt $attempt failed" | tee -a image-publish-audit.log
+            if [[ "$attempt" -lt 6 ]]; then sleep 20; fi
+          done
+          if [[ "$logged_in" != "true" ]]; then
+            echo "failed registry login" | tee -a image-publish-audit.log
+            exit 1
+          fi
+          echo "succeeded registry login" | tee -a image-publish-audit.log
+          for repo in portal-web api-gateway orders-service inventory-service notifications-service; do
+            source="local-gate/$repo:$GITHUB_RUN_ID"
+            target="cragentsdlcdev55eb.azurecr.io/$repo:$GITHUB_RUN_ID"
+            docker image tag "$source" "$target"
+            echo "started push image=$repo run=$GITHUB_RUN_ID" | tee -a image-publish-audit.log
+            pushed=false
+            for attempt in 1 2 3 4 5 6; do
+              if docker image push "$target" > "push-$repo.log" 2>&1; then
+                pushed=true
+                break
+              fi
+              cat "push-$repo.log"
+              echo "push attempt $attempt failed for $repo" | tee -a image-publish-audit.log
+              if [[ "$attempt" -lt 6 ]]; then sleep 20; fi
+            done
+            if [[ "$pushed" != "true" ]]; then
+              echo "failed push image=$repo" | tee -a image-publish-audit.log
+              exit 1
+            fi
+            digest="$(sed -nE 's/^.*digest: (sha256:[0-9a-f]{64}).*$/\1/p' "push-$repo.log" | tail -n 1)"
+            if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error::Registry manifest digest missing for $repo."
+              exit 1
+            fi
+            echo "started registry digest check image=$repo" | tee -a image-publish-audit.log
+            if registry_digest="$(az acr repository show --name cragentsdlcdev55eb \
+              --subscription "$TARGET_SUBSCRIPTION" --image "$repo:$GITHUB_RUN_ID" \
+              --query digest --output tsv)"; then
+              echo "succeeded registry digest check image=$repo" | tee -a image-publish-audit.log
+            else
+              echo "failed registry digest check image=$repo" | tee -a image-publish-audit.log
+              exit 1
+            fi
+            if [[ "$registry_digest" != "$digest" ]]; then
+              echo "::error::Registry digest differs from the pushed digest for $repo."
+              exit 1
+            fi
+            jq -cn --arg repo "$repo" --arg digest "$digest" \
+              --arg image "cragentsdlcdev55eb.azurecr.io/$repo@$digest" \
+              '{repository:$repo,digest:$digest,image:$image}' >> published-image-lines.json
+            echo "succeeded push image=$repo digest=$digest" | tee -a image-publish-audit.log
+          done
+          jq -s . published-image-lines.json > published-images.json
+      - name: Preserve image digest evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: published-images-${{ github.run_id }}
+          path: |
+            image-publish-audit.log
+            published-images.json
+          if-no-files-found: warn
+  bootstrap-rg:
+    if: ${{ inputs.bootstrap_rg }}
+    needs: [preview-bootstrap, validate-bicep, quality]
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bootstrap-preview-${{ github.run_id }}
+          path: approved-preview
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck and create the resource group
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "started bootstrap what-if run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee bootstrap-apply-audit.log
+          if az deployment sub what-if \
+            --name "rg-bootstrap-recheck-$GITHUB_RUN_ID" \
+            --location northeurope \
+            --template-file infra/bootstrap-rg.bicep \
+            --no-pretty-print --no-prompt --output json > recheck-what-if.json; then
+            echo "succeeded bootstrap what-if" | tee -a bootstrap-apply-audit.log
+          else
+            code=$?
+            echo "failed bootstrap what-if exit=$code" | tee -a bootstrap-apply-audit.log
+            exit "$code"
+          fi
+          node scripts/validate-rg-preview.js recheck-what-if.json approved-preview/bootstrap-what-if.json
+          echo "started resource-group bootstrap run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee -a bootstrap-apply-audit.log
+          if az deployment sub create \
+            --name "rg-bootstrap-$GITHUB_RUN_ID" \
+            --location northeurope \
+            --template-file infra/bootstrap-rg.bicep \
+            --no-prompt --output json > bootstrap-result.json; then
+            echo "succeeded resource-group bootstrap" | tee -a bootstrap-apply-audit.log
+          else
+            code=$?
+            echo "failed resource-group bootstrap exit=$code" | tee -a bootstrap-apply-audit.log
+            exit "$code"
+          fi
+      - name: Preserve bootstrap evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bootstrap-apply-${{ github.run_id }}
+          path: |
+            bootstrap-apply-audit.log
+            recheck-what-if.json
+            bootstrap-result.json
+          if-no-files-found: warn
+  preview-runtime-credentials:
+    if: ${{ inputs.foundation_action == 'runtime-apply' }}
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      seed_required: ${{ steps.preview.outputs.seed_required }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - id: preview
+        name: Preview the one-time credential seed or verify reuse
+        run: bash scripts/runtime-stage.sh secrets-preview
+      - name: Preserve redacted credential preview
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: runtime-credentials-preview-${{ github.run_id }}
+          path: |
+            runtime-audit.log
+            runtime-what-if.json
+            runtime-template.sha256
+          if-no-files-found: warn
+  seed-runtime-credentials:
+    if: ${{ inputs.foundation_action == 'runtime-apply' && needs.preview-runtime-credentials.outputs.seed_required == 'true' }}
+    needs: [preview-runtime-credentials, validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 15
+    concurrency:
+      group: agentsdlc-dev-55eb-runtime-apply
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: runtime-credentials-preview-${{ github.run_id }}
+          path: approved-runtime
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck and persist the administrator credential through IaC
+        run: bash scripts/runtime-stage.sh secrets-apply
+      - name: Preserve credential seed audit without credential values
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: runtime-credentials-apply-${{ github.run_id }}
+          path: |
+            runtime-audit.log
+            runtime-what-if.json
+            runtime-template.sha256
+          if-no-files-found: warn
+  preview-runtime:
+    if: ${{ always() && inputs.foundation_action == 'runtime-apply' && needs.preview-runtime-credentials.result == 'success' && (needs.seed-runtime-credentials.result == 'success' || needs.seed-runtime-credentials.result == 'skipped') && needs.validate-bicep.result == 'success' && needs.quality.result == 'success' }}
+    needs: [preview-runtime-credentials, seed-runtime-credentials, validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview only PostgreSQL, telemetry and the private runtime environment
+        run: bash scripts/runtime-stage.sh core-preview
+      - name: Preserve the redacted runtime preview
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: runtime-preview-${{ github.run_id }}
+          path: |
+            runtime-audit.log
+            runtime-what-if.json
+            runtime-template.sha256
+            runtime-credential-id.txt
+          if-no-files-found: warn
+  apply-runtime:
+    if: ${{ always() && !cancelled() && inputs.foundation_action == 'runtime-apply' && needs.preview-runtime.result == 'success' }}
+    needs: [preview-runtime]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 45
+    concurrency:
+      group: agentsdlc-dev-55eb-runtime-apply
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: runtime-preview-${{ github.run_id }}
+          path: approved-runtime
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck the approved preview and deploy runtime prerequisites
+        run: bash scripts/runtime-stage.sh core-apply
+      - name: Preserve runtime deployment evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: runtime-apply-${{ github.run_id }}
+          path: |
+            runtime-audit.log
+            runtime-what-if.json
+            runtime-template.sha256
+            runtime-credential-id.txt
+            runtime-outputs.json
+          if-no-files-found: warn
+  preview-runtime-recovery:
+    if: ${{ inputs.foundation_action == 'runtime-recovery' }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview the missing extension and database URL only
+        run: bash scripts/runtime-stage.sh recovery-preview
+      - name: Preserve the redacted recovery preview
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: runtime-recovery-preview-${{ github.run_id }}
+          path: |
+            runtime-audit.log
+            runtime-what-if.json
+            runtime-template.sha256
+            runtime-credential-id.txt
+          if-no-files-found: warn
+  apply-runtime-recovery:
+    if: ${{ inputs.foundation_action == 'runtime-recovery' }}
+    needs: [preview-runtime-recovery]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 25
+    concurrency:
+      group: agentsdlc-dev-55eb-runtime-apply
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: runtime-recovery-preview-${{ github.run_id }}
+          path: approved-runtime
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck and apply the scoped runtime recovery
+        run: bash scripts/runtime-stage.sh recovery-apply
+      - name: Preserve runtime recovery evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: runtime-recovery-apply-${{ github.run_id }}
+          path: |
+            runtime-audit.log
+            runtime-what-if.json
+            runtime-template.sha256
+            runtime-credential-id.txt
+          if-no-files-found: warn
+  preview-private-workloads:
+    if: ${{ inputs.foundation_action == 'private-preview' || inputs.foundation_action == 'private-apply' }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview the five private workloads without deploying
+        env:
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+        run: bash scripts/private-preview.sh
+      - name: Preserve redacted private workload preview
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: private-preview-${{ github.run_id }}
+          path: |
+            private-preview-audit.log
+            private-parameters.json
+            private-what-if.json
+            private-domain.txt
+            private-template.sha256
+          if-no-files-found: warn
+  apply-private-workloads:
+    if: ${{ inputs.foundation_action == 'private-apply' }}
+    needs: [preview-private-workloads]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 30
+    concurrency:
+      group: agentsdlc-dev-55eb-runtime-apply
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: private-preview-${{ github.run_id }}
+          path: approved-private
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck and apply private workloads
+        env:
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+        run: bash scripts/private-preview.sh apply
+      - name: Preserve redacted application deployment evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: private-apply-${{ github.run_id }}
+          path: |
+            private-preview-audit.log
+            private-parameters.json
+            private-what-if.json
+            private-domain.txt
+            private-template.sha256
+          if-no-files-found: warn
+  preview-public-workloads:
+    if: ${{ inputs.foundation_action == 'public-preview' || inputs.foundation_action == 'public-apply' }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 25
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview the Entra-protected public portal promotion without deploying
+        env:
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+          ENTRA_CLIENT_ID: ${{ vars.ENTRA_CLIENT_ID }}
+          ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
+          ENTRA_REDIRECT_URI: ${{ vars.ENTRA_REDIRECT_URI }}
+        run: bash scripts/public-stage.sh
+      - name: Preserve the redacted public workload preview
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: public-preview-${{ github.run_id }}
+          path: |
+            public-release-audit.log
+            public-what-if.json
+            public-domain.txt
+            public-callback-uri.txt
+            public-url.txt
+            public-template.sha256
+          if-no-files-found: warn
+  apply-public-workloads:
+    if: ${{ inputs.foundation_action == 'public-apply' }}
+    needs: [preview-public-workloads]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 60
+    concurrency:
+      group: agentsdlc-dev-55eb-runtime-apply
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: public-preview-${{ github.run_id }}
+          path: approved-public
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck, promote and verify the Entra-protected public portal
+        env:
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+          ENTRA_CLIENT_ID: ${{ vars.ENTRA_CLIENT_ID }}
+          ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
+          ENTRA_CLIENT_SECRET: ${{ secrets.ENTRA_CLIENT_SECRET }}
+          ENTRA_REDIRECT_URI: ${{ vars.ENTRA_REDIRECT_URI }}
+        run: bash scripts/public-stage.sh apply
+      - name: Preserve redacted public release verification
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: public-apply-${{ github.run_id }}
+          path: |
+            public-release-audit.log
+            public-what-if.json
+            public-domain.txt
+            public-callback-uri.txt
+            public-url.txt
+            public-template.sha256
+            public-live-apps.json
+            health-audit.log
+            health-live.json
+            health-execution.txt
+            journey-audit.log
+            journey-executions.txt
+          if-no-files-found: warn
+  preview-private-health:
+    if: ${{ inputs.foundation_action == 'health-preview' || inputs.foundation_action == 'health-apply' }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview the private in-environment health job
+        run: bash scripts/health-stage.sh
+      - name: Preserve the redacted health preview
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: health-preview-${{ github.run_id }}
+          path: |
+            health-audit.log
+            health-what-if.json
+            health-domain.txt
+            health-template.sha256
+          if-no-files-found: warn
+  apply-private-health:
+    if: ${{ inputs.foundation_action == 'health-apply' }}
+    needs: [preview-private-health]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 25
+    concurrency:
+      group: agentsdlc-dev-55eb-runtime-apply
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: health-preview-${{ github.run_id }}
+          path: approved-health
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck and deploy the private health job
+        run: bash scripts/health-stage.sh apply
+      - name: Preserve redacted health-job deployment evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: health-apply-${{ github.run_id }}
+          path: |
+            health-audit.log
+            health-what-if.json
+            health-domain.txt
+            health-template.sha256
+            health-live.json
+          if-no-files-found: warn
+  run-private-health:
+    if: ${{ inputs.foundation_action == 'health-run' }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 25
+    concurrency:
+      group: agentsdlc-dev-55eb-runtime-apply
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Validate and run the existing private health job
+        run: bash scripts/health-stage.sh run
+      - name: Preserve redacted health execution evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: health-run-${{ github.run_id }}
+          path: |
+            health-audit.log
+            health-live.json
+            health-execution.txt
+          if-no-files-found: warn
+  run-private-journey:
+    if: ${{ inputs.foundation_action == 'journey-run' }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 45
+    concurrency:
+      group: agentsdlc-dev-55eb-runtime-apply
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Run one synthetic order and verify it after scale-to-zero
+        env:
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+        run: bash scripts/journey-stage.sh
+      - name: Preserve redacted journey evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: journey-run-${{ github.run_id }}
+          path: |
+            health-audit.log
+            health-live.json
+            journey-audit.log
+            journey-executions.txt
+          if-no-files-found: warn
+  block-unsafe-release:
+    if: ${{ inputs.foundation_action == 'none' && !inputs.bootstrap_rg && !inputs.preview_bootstrap && !inputs.verify_oidc }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - run: |
+          echo "::error::Application release remains disabled: protected workload promotion, Entra sign-in and live application health gates are unfinished. Foundation, credentials and runtime prerequisites do not deploy the application."
+          exit 1

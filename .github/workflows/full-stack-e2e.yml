@@ -1,6 +1,28 @@
 name: Full-stack browser rehearsal
 
 on:
+  workflow_call:
+    inputs:
+      portal_ref:
+        required: true
+        type: string
+      gateway_ref:
+        required: true
+        type: string
+      orders_ref:
+        required: true
+        type: string
+      inventory_ref:
+        required: true
+        type: string
+      notifications_ref:
+        required: true
+        type: string
+      preserve_images:
+        description: Preserve the built and smoke-tested images for later promotion
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
       portal_ref:
@@ -28,6 +50,11 @@ on:
         required: true
         default: main
         type: string
+      preserve_images:
+        description: Preserve the built and smoke-tested images for later promotion
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -35,7 +62,7 @@ permissions:
 jobs:
   rehearsal:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16-alpine
@@ -90,6 +117,25 @@ jobs:
       - name: Install Chromium
         working-directory: portal-web
         run: npx playwright install --with-deps chromium
+      - name: Run application quality gates
+        run: |
+          set -euo pipefail
+          for repo in portal-web api-gateway orders-service inventory-service notifications-service; do
+            npm --prefix "$repo" run lint
+            npm --prefix "$repo" run test:syntax
+            npm --prefix "$repo" run test:integration
+            npm --prefix "$repo" audit --audit-level=high
+          done
+          npm --prefix orders-service run test:unit
+          npm --prefix portal-web run test:e2e
+      - name: Build application images
+        run: |
+          set -euo pipefail
+          for repo in portal-web api-gateway orders-service inventory-service notifications-service; do
+            docker build --tag "local-gate/$repo:$GITHUB_RUN_ID" "$repo"
+          done
+      - name: Smoke-test built images
+        run: bash platform-infra/scripts/smoke-images.sh
       - name: Record tested revisions
         run: |
           for repo in platform-infra portal-web api-gateway orders-service inventory-service notifications-service; do
@@ -101,3 +147,35 @@ jobs:
         run: node --test platform-infra/tests/postgres-state.test.js
       - name: Exercise the order journey and verify distributed tracing
         run: node platform-infra/scripts/validate-telemetry.js
+      - name: Package verified images and source revisions
+        if: ${{ inputs.preserve_images }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir release-images
+          images=()
+          for repo in portal-web api-gateway orders-service inventory-service notifications-service; do
+            image="local-gate/$repo:$GITHUB_RUN_ID"
+            images+=("$image")
+            printf '%s %s %s\n' "$repo" "$(git -C "$repo" rev-parse HEAD)" \
+              "$(docker image inspect --format '{{.Id}}' "$image")" >> release-images/images.txt
+          done
+          docker image save "${images[@]}" | gzip -1 > release-images/images.tar.gz
+          (cd release-images && sha256sum images.tar.gz images.txt > SHA256SUMS)
+      - name: Verify packaged images and source revisions
+        if: ${{ inputs.preserve_images }}
+        env:
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+        run: node platform-infra/scripts/verify-image-artifact.js loaded release-images "$GITHUB_RUN_ID"
+      - name: Preserve verified images
+        if: ${{ inputs.preserve_images }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-images-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-images/
+          if-no-files-found: error
+          retention-days: 30
