@@ -208,7 +208,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js
+      - run: node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js tests/verify-image-artifact.test.js
   quality:
     needs: validate-inputs
     uses: ./.github/workflows/full-stack-e2e.yml
