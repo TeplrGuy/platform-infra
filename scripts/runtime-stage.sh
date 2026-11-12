@@ -75,6 +75,17 @@ preview() {
   git ls-files -z infra scripts/runtime-stage.sh scripts/runtime-preview.js | xargs -0 sha256sum > runtime-template.sha256
 }
 
+secrets_change_type() {
+  node -e '
+const fs = require("node:fs");
+const p = JSON.parse(fs.readFileSync("runtime-what-if.json", "utf8"));
+const root = "/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/microsoft.keyvault/vaults/kv-agentsdlc-dev-7c77/secrets/postgres-admin-password";
+const c = (p.changes || []).find(x => (x.resourceId || "").toLowerCase() === root);
+if (!c?.changeType) process.exit(2);
+process.stdout.write(c.changeType);
+'
+}
+
 apply() {
   local stage="$1" template="$2"
   sha256sum --check "approved-runtime/runtime-template.sha256"
@@ -88,15 +99,23 @@ apply() {
 
 case "$mode" in
   secrets-preview)
-    if [[ "$(credential_state)" == exists ]]; then
-      echo "seed_required=false" >> "$GITHUB_OUTPUT"
-      audit "credential-reuse no credential change requested"
-    else
-      require_new_database
-      echo "seed_required=true" >> "$GITHUB_OUTPUT"
-      export POSTGRES_ADMIN_PASSWORD="$RUNTIME_POSTGRES_PASSWORD"
-      preview secrets infra/runtime-secrets.bicepparam
-    fi
+    export POSTGRES_ADMIN_PASSWORD="$RUNTIME_POSTGRES_PASSWORD"
+    preview secrets infra/runtime-secrets.bicepparam
+    change_type="$(secrets_change_type)"
+    case "$change_type" in
+      Create)
+        require_new_database
+        echo "seed_required=true" >> "$GITHUB_OUTPUT"
+        ;;
+      Modify|NoChange)
+        echo "seed_required=false" >> "$GITHUB_OUTPUT"
+        audit "credential-reuse no credential change requested"
+        ;;
+      *)
+        echo "::error::Unexpected runtime secret change type: $change_type"
+        exit 1
+        ;;
+    esac
     ;;
   secrets-apply)
     credential_status="$(credential_state)"
