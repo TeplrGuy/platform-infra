@@ -81,8 +81,7 @@ const fs = require("node:fs");
 const p = JSON.parse(fs.readFileSync("runtime-what-if.json", "utf8"));
 const root = "/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/microsoft.keyvault/vaults/kv-agentsdlc-dev-7c77/secrets/postgres-admin-password";
 const c = (p.changes || []).find(x => (x.resourceId || "").toLowerCase() === root);
-if (!c?.changeType) process.exit(2);
-process.stdout.write(c.changeType);
+process.stdout.write(c?.changeType || "NoChange");
 '
 }
 
