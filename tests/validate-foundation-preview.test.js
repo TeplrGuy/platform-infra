@@ -34,8 +34,8 @@ function preview() {
     resourceGroup: 'agtsdlc-dev-rg', location: 'northeurope', tags: { ...tags }
   }));
   for (const [scope, id, role] of [
-    [registry, 'aa520d40-5903-5831-987c-f3857fe688c0', '8311e382-0749-4cb8-b61a-304f252e45ec'],
-    [vault, 'a248f7fa-c840-53f1-bb9d-311671c2f582', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7']
+    [registry, 'e5099734-5264-54b4-9ca8-0ce1a5f8a2ae', '8311e382-0749-4cb8-b61a-304f252e45ec'],
+    [vault, 'bd65f59a-6054-566f-86cc-95fe68295d22', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7']
   ]) {
     resources.push({
       id: `${scope}/providers/Microsoft.Authorization/roleAssignments/${id}`,
