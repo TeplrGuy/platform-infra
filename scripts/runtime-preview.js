@@ -67,7 +67,7 @@ function validate(preview, stage) {
       throw new Error('An existing database credential must never be overwritten.');
     }
     const after = change.after;
-    const props = after.properties;
+    const props = after.properties ?? (id === `${pg}/databases/agenticsdldemo`.toLowerCase() ? {} : undefined);
     if (!props || typeof props !== 'object') throw new Error('Runtime properties are unresolved.');
     if ([pg, log, insights, environment].map(value => value.toLowerCase()).includes(id)) {
       requireValue(after.location, 'northeurope', 'Runtime region differs from the approved plan.');
@@ -79,7 +79,10 @@ function validate(preview, stage) {
       requireValue(after.sku?.name, 'Standard_B1ms', 'PostgreSQL size changed.');
       requireValue(after.sku?.tier, 'Burstable', 'PostgreSQL tier changed.');
       requireValue(props.version, '16', 'PostgreSQL version changed.');
-      requireValue(props.administratorLogin, 'agenticsadmin', 'PostgreSQL administrator changed.');
+      if (props.administratorLogin !== 'agenticsadmin' &&
+          !(change.changeType === 'Create' && props.administratorLogin === '*******')) {
+        throw new Error('PostgreSQL administrator changed or is unresolved.');
+      }
       requireValue(props.storage?.storageSizeGB, 32, 'PostgreSQL storage changed.');
       requireValue(props.backup?.backupRetentionDays, 7, 'PostgreSQL backup retention changed.');
       requireValue(props.backup?.geoRedundantBackup, 'Disabled', 'PostgreSQL backup topology changed.');

@@ -89,6 +89,7 @@ test('foundation contains no workload or secrets and scopes publisher access to 
 test('runtime prerequisites contain no workloads or role grants and never expose a credential output', () => {
   const template = getTemplate('infra/runtime-foundation.bicep');
   assert.equal(template.parameters.postgresAdminPassword.type.toLowerCase(), 'securestring');
+  assert.equal(template.resources.postgres.properties.parameters.administratorLogin.value, 'agenticsadmin');
   const resources = Object.values(template.resources).flatMap(module => Object.values(module.properties.template.resources));
   assert.equal(resources.filter(resource => !resource.condition).length, 8);
   assert.equal(template.resources.secrets.properties.parameters.enableEntraAuth.value, false);

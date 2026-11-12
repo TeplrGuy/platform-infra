@@ -67,6 +67,15 @@ test('runtime preview enforces the approved database, telemetry and environment 
   assert.doesNotThrow(() => validateAgainst(recheck, 'core', approved));
   recheck.changes[0].after.apiVersion = 'unreviewed';
   assert.throws(() => validateAgainst(recheck, 'core', approved), /changed after approval/);
+  const azurePreview = core();
+  azurePreview.changes[0].after.properties.administratorLogin = '*******';
+  delete azurePreview.changes[1].after.properties;
+  assert.doesNotThrow(() => validate(azurePreview, 'core'));
+  azurePreview.changes[0].changeType = 'Modify';
+  assert.throws(() => validate(azurePreview, 'core'), /administrator/);
+  azurePreview.changes[0].changeType = 'Create';
+  azurePreview.changes[0].after.properties.administratorLogin = 'another-admin';
+  assert.throws(() => validate(azurePreview, 'core'), /administrator/);
 });
 
 test('credential seeding rejects overwrite, deletion and any other secret', () => {
