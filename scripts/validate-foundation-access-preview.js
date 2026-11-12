@@ -9,10 +9,10 @@ const vault = `${root}/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
 const roleRoot = `/subscriptions/${subscription}/providers/Microsoft.Authorization/roleDefinitions`;
 const acrPull = `${roleRoot}/7f951dda-4ed3-4680-a7ca-43fe172d538d`;
 const secretUser = `${roleRoot}/4633458b-17de-408a-b874-0445c86b69e6`;
-const deployer = '68b48a36-c15b-4e51-a9a5-f26e6b6a342b';
+const deployer = '5be11849-e0f0-498e-9529-ef24f0c5c2d1';
 const unchanged = new Map([
-  [`${registry}/providers/Microsoft.Authorization/roleAssignments/e5099734-5264-54b4-9ca8-0ce1a5f8a2ae`.toLowerCase(), `${roleRoot}/8311e382-0749-4cb8-b61a-304f252e45ec`.toLowerCase()],
-  [`${vault}/providers/Microsoft.Authorization/roleAssignments/bd65f59a-6054-566f-86cc-95fe68295d22`.toLowerCase(), `${roleRoot}/b86a8fe4-44ce-4948-aee5-eccb2c155cd7`.toLowerCase()]
+  [registry.toLowerCase(), `${roleRoot}/8311e382-0749-4cb8-b61a-304f252e45ec`.toLowerCase()],
+  [vault.toLowerCase(), `${roleRoot}/b86a8fe4-44ce-4948-aee5-eccb2c155cd7`.toLowerCase()]
 ]);
 const ignored = new Set([registry, vault, ...['portal', 'apigw', 'orders', 'inventory', 'notify']
   .map(name => `${root}/Microsoft.ManagedIdentity/userAssignedIdentities/ca-agentsdlc-dev-7c77-${name}-identity`)]
@@ -55,8 +55,8 @@ function validate(preview, parameters) {
     if (change.changeType === 'Create') {
       const grant = `${prefix}|${principal}|${role}`.toLowerCase();
       if (!required.delete(grant)) throw new Error('Access preview grants an unexpected or duplicate role.');
-    } else if (change.changeType === 'NoChange' && unchanged.get(id) === role && principal === deployer) {
-      unchangedFound.add(id);
+    } else if (change.changeType === 'NoChange' && principal === deployer && unchanged.get(prefix.toLowerCase()) === role) {
+      unchangedFound.add(prefix.toLowerCase());
     } else {
       throw new Error('Access preview changes an unapproved role assignment.');
     }

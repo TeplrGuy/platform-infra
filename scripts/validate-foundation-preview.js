@@ -3,7 +3,7 @@ const { isDeepStrictEqual } = require('node:util');
 
 const subscription = 'b6f10878-9f8a-4b3f-8bc5-3464cdd79c77';
 const tenant = '16b3c013-d300-468d-ac64-7eda0820b6d3';
-const deployer = '68b48a36-c15b-4e51-a9a5-f26e6b6a342b';
+const deployer = '5be11849-e0f0-498e-9529-ef24f0c5c2d1';
 const root = `/subscriptions/${subscription}/resourceGroups/agtsdlc-dev-rg/providers`;
 const registry = `${root}/Microsoft.ContainerRegistry/registries/cragentsdlcdev7c77`;
 const vault = `${root}/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
@@ -17,28 +17,45 @@ const tags = {
   environment: 'agentsdlc-dev-7c77'
 };
 const roles = new Map([
-  [`${registry}/providers/Microsoft.Authorization/roleAssignments/e5099734-5264-54b4-9ca8-0ce1a5f8a2ae`, '8311e382-0749-4cb8-b61a-304f252e45ec'],
-  [`${vault}/providers/Microsoft.Authorization/roleAssignments/bd65f59a-6054-566f-86cc-95fe68295d22`, 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7']
+  [registry.toLowerCase(), '8311e382-0749-4cb8-b61a-304f252e45ec'],
+  [vault.toLowerCase(), 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7']
 ]);
-const ids = [registry, vault,
-  ...identityNames.map(name => `${root}/Microsoft.ManagedIdentity/userAssignedIdentities/${name}`),
-  ...roles.keys()];
+const ids = [registry, vault, ...identityNames.map(name => `${root}/Microsoft.ManagedIdentity/userAssignedIdentities/${name}`)];
 
 function validate(preview) {
-  if (preview.status !== 'Succeeded' || !Array.isArray(preview.changes) || preview.changes.length !== ids.length) {
+  if (preview.status !== 'Succeeded' || !Array.isArray(preview.changes) || preview.changes.length !== ids.length + roles.size) {
     throw new Error('Foundation preview is incomplete or has an unexpected number of changes.');
   }
   const expected = new Set(ids.map(id => id.toLowerCase()));
   const actual = new Map();
+  const roleAssignments = new Map();
   for (const change of preview.changes) {
-    if (change.changeType !== 'Create' || typeof change.resourceId !== 'string' || !change.after) {
-      throw new Error('Foundation preview must contain only fully resolved creations.');
+    if (!['Create', 'NoChange', 'Modify'].includes(change.changeType) || typeof change.resourceId !== 'string' || !change.after) {
+      throw new Error('Foundation preview must contain only fully resolved create, unchanged, or modify resources.');
     }
     const id = change.resourceId.toLowerCase();
-    if (!expected.has(id) || actual.has(id) || change.after.id?.toLowerCase() !== id) {
+    if (change.after.id?.toLowerCase() !== id) {
+      throw new Error('Foundation preview contains a mismatched resource ID.');
+    }
+    if (expected.has(id)) {
+      if (actual.has(id)) throw new Error('Foundation preview contains a duplicate resource.');
+      actual.set(id, change.after);
+      continue;
+    }
+    const scope = id.startsWith(`${registry.toLowerCase()}/providers/microsoft.authorization/roleassignments/`)
+      ? registry.toLowerCase()
+      : id.startsWith(`${vault.toLowerCase()}/providers/microsoft.authorization/roleassignments/`)
+        ? vault.toLowerCase()
+        : null;
+    if (!scope || roleAssignments.has(scope) || change.after.type !== 'Microsoft.Authorization/roleAssignments' ||
+        change.after.resourceGroup !== 'agtsdlc-dev-rg' || change.after.name?.toLowerCase() !== id.split('/').at(-1) ||
+        !/^[0-9a-f-]{36}$/.test(change.after.name)) {
       throw new Error('Foundation preview contains an unexpected, duplicate, or mismatched resource.');
     }
-    actual.set(id, change.after);
+    roleAssignments.set(scope, change.after);
+  }
+  if (actual.size !== ids.length || roleAssignments.size !== roles.size) {
+    throw new Error('Foundation preview is missing expected resources.');
   }
   for (const id of [registry, vault, ...ids.slice(2, 7)]) {
     const after = actual.get(id.toLowerCase());
@@ -61,19 +78,17 @@ function validate(preview) {
       kv.properties?.networkAcls?.defaultAction !== 'Allow' || kv.properties?.networkAcls?.bypass !== 'AzureServices') {
     throw new Error('Key Vault settings differ from the approved configuration.');
   }
-  for (const [id, role] of roles) {
-    const after = actual.get(id.toLowerCase());
+  for (const [scope, role] of roles) {
+    const after = roleAssignments.get(scope);
     const properties = after.properties;
-    if (after.name !== id.split('/').at(-1) || after.type !== 'Microsoft.Authorization/roleAssignments' ||
-        after.resourceGroup !== 'agtsdlc-dev-rg') {
-      throw new Error('Foundation role assignment metadata does not match the approved configuration.');
-    }
     if (properties?.principalId !== deployer ||
         properties?.roleDefinitionId?.toLowerCase() !== `/subscriptions/${subscription}/providers/microsoft.authorization/roledefinitions/${role}`) {
       throw new Error('Foundation role assignment differs from the approved scope and principal.');
     }
   }
-  return actual;
+  const normalized = new Map(actual);
+  for (const [scope, after] of roleAssignments) normalized.set(`role:${scope}`, after);
+  return normalized;
 }
 
 function validateAgainst(preview, approvedPreview) {

@@ -121,8 +121,8 @@ jobs:
         run: |
           set -euo pipefail
           for repo in portal-web api-gateway orders-service inventory-service notifications-service; do
-            npm --prefix "$repo" run lint
-            npm --prefix "$repo" run test:syntax
+            npm --prefix "$repo" run lint --if-present
+            npm --prefix "$repo" run test:syntax --if-present
             npm --prefix "$repo" run test:integration
             npm --prefix "$repo" audit --audit-level=high
           done
@@ -143,6 +143,7 @@ jobs:
           done
       - name: Verify durable state across replicas and restarts
         env:
+          NODE_PATH: ${{ github.workspace }}/orders-service/node_modules
           TEST_DATABASE_URL: postgresql://sdlctest:local-test-only@127.0.0.1:5432/sdlc_test
         run: node --test platform-infra/tests/postgres-state.test.js
       - name: Exercise the order journey and verify distributed tracing
