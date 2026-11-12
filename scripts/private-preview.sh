@@ -35,13 +35,14 @@ azure account account show --output json |
 [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || { echo "::error::Checkout revision mismatch."; exit 1; }
 location="$(azure resource-group group show --name agtsdlc-dev-rg --query location --output tsv)"
 [[ "$location" == northeurope ]] || { echo "::error::Resource group location changed."; exit 1; }
-environment_id="/subscriptions/8fcc5e8e-6540-4288-89e7-849e94290205/resourceGroups/agtsdlc-dev-rg/providers/Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb"
+scope="/subscriptions/8fcc5e8e-6540-4288-89e7-849e94290205/resourceGroups/agtsdlc-dev-rg/providers"
+environment_id="$scope/Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb"
 environment="$(azure environment resource show --ids "$environment_id" --api-version 2026-07-01 \
   --query '{state:properties.provisioningState,domain:properties.defaultDomain}' --output json)"
 [[ "$(jq -r '.state' <<< "$environment")" == Succeeded ]] || { echo "::error::Runtime environment is not ready."; exit 1; }
 domain="$(jq -er '.domain' <<< "$environment")"
-registry_server="$(azure registry resource show --ids "/subscriptions/8fcc5e8e-6540-4288-89e7-849e94290205/resourceGroups/agtsdlc-dev-rg/providers/Microsoft.ContainerRegistry/registries/cragentsdlcdev55eb" --api-version 2025-11-01 --query properties.loginServer --output tsv)"
-vault_uri="$(azure vault resource show --ids "/subscriptions/8fcc5e8e-6540-4288-89e-849e94290205/resourceGroups/agtsdlc-dev-rg/providers/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb" --api-version 2026-05-15 --query properties.vaultUri --output tsv)"
+registry_server="$(azure registry resource show --ids "$scope/Microsoft.ContainerRegistry/registries/cragentsdlcdev55eb" --api-version 2025-11-01 --query properties.loginServer --output tsv)"
+vault_uri="$(azure vault resource show --ids "$scope/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb" --api-version 2026-05-15 --query properties.vaultUri --output tsv)"
 [[ "$registry_server" == cragentsdlcdev55eb.azurecr.io && "$vault_uri" == https://kv-agentsdlc-dev-55eb.vault.azure.net/ ]] ||
   { echo "::error::Registry or vault endpoint differs from the approved target."; exit 1; }
 node scripts/private-preview.js parameters > private-parameters.json
