@@ -28,21 +28,21 @@ function preview() {
       { INVENTORY_SERVICE_URL: 3, NOTIFICATIONS_SERVICE_URL: 4 }, {}, {}][i];
     const env = [
       { name: 'PORT', value: '3000' },
-      { name: 'ENVIRONMENT_NAME', value: 'agentsdlc-dev-55eb' },
+      { name: 'ENVIRONMENT_NAME', value: 'agentsdlc-dev-7c77' },
       { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: '[REDACTED]' },
       { name: 'OTEL_SERVICE_NAME', value: service.name },
       ...Object.entries(urls).map(([name, target]) => ({ name, value: `https://${names[target]}.internal.${domain}` })),
       ...(i >= 2 ? [{ name: 'DATABASE_URL', secretRef: 'postgres-database-url' }] : [])
     ];
     const secrets = i >= 2 ? [{ name: 'postgres-database-url',
-      keyVaultUrl: 'https://kv-agentsdlc-dev-55eb.vault.azure.net/secrets/postgres-database-url', identity }] : [];
+      keyVaultUrl: 'https://kv-agentsdlc-dev-7c77.vault.azure.net/secrets/postgres-database-url', identity }] : [];
     return { changeType: 'Create', resourceId: id, after: {
       id, type: 'Microsoft.App/containerApps', location: 'northeurope', tags: foundation.tags.value,
       identity: { type: 'UserAssigned', userAssignedIdentities: { [identity]: {} } },
       properties: {
-        managedEnvironmentId: `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb`,
+        managedEnvironmentId: `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77`,
         configuration: { activeRevisionsMode: 'Single', ingress: { external: false, targetPort: 3000, transport: 'auto' },
-          registries: [{ server: 'cragentsdlcdev55eb.azurecr.io', identity }], secrets },
+          registries: [{ server: 'cragentsdlcdev7c77.azurecr.io', identity }], secrets },
         template: { scale: { minReplicas: 0, maxReplicas: 3 }, containers: [{
           name: service.name, image: imageMap[service.key], resources: { cpu: 0.5, memory: '1Gi' }, env,
           probes: ['Liveness', 'Readiness', 'Startup'].map(type => ({ type, httpGet: { path: '/health', port: 3000 } }))
@@ -91,9 +91,9 @@ test('masked secret names require the exact compiled bindings', () => {
 
 test('Azure unresolved references are accepted only for the approved resources', () => {
   const p = preview();
-  const envId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb`;
-  const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb`;
-  const registryId = `${root}Microsoft.ContainerRegistry/registries/cragentsdlcdev55eb`;
+  const envId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77`;
+  const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
+  const registryId = `${root}Microsoft.ContainerRegistry/registries/cragentsdlcdev7c77`;
   for (const change of p.changes) {
     const config = change.after.properties.configuration;
     config.registries[0].server = `[reference('${registryId}', '2025-11-01').loginServer]`;
@@ -155,8 +155,8 @@ case "$1 $2 $3" in
   'resource show --ids')
     case "$4" in
       */managedEnvironments/*) printf '{"state":"Succeeded","domain":"%s"}\\n' "$TEST_DOMAIN" ;;
-      */registries/*) echo cragentsdlcdev55eb.azurecr.io ;;
-      */vaults/*) echo https://kv-agentsdlc-dev-55eb.vault.azure.net/ ;;
+      */registries/*) echo cragentsdlcdev7c77.azurecr.io ;;
+      */vaults/*) echo https://kv-agentsdlc-dev-7c77.vault.azure.net/ ;;
       */containerApps/*) cat "$TEST_LIVE_DIR/\${4##*/}.json" ;;
       *) exit 1 ;;
     esac ;;

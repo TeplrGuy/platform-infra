@@ -13,11 +13,11 @@ function preview() {
       type: 'Microsoft.Resources/resourceGroups',
       location: 'northeurope',
       tags: {
-        'app-onboard-session-id': '55eb0364-fed8-4fc9-95e3-405ad428b06d',
+        'app-onboard-session-id': '7c770364-fed8-4fc9-95e3-405ad428b06d',
         'app-onboard-skill': 'true',
         'created-at': '2026-11-11T15:43:42.2240991-05:00',
         'deployed-by': 'github-actions',
-        environment: 'agentsdlc-dev-55eb'
+        environment: 'agentsdlc-dev-7c77'
       }
     }
   }] };

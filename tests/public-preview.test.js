@@ -11,8 +11,8 @@ const domain = 'example-1234.northeurope.azurecontainerapps.io';
 const clientId = 'c0ffee00-1234-4567-89ab-0123456789ab';
 const tenantId = '16b3c013-d300-468d-ac64-7eda0820b6d3';
 const names = foundation.appNames.value;
-const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb`;
-const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb`;
+const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77`;
+const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
 const build = process.platform === 'win32'
   ? spawnSync('az bicep build --file infra/public-workloads.bicep --stdout', { shell: true, encoding: 'utf8' })
   : spawnSync('az', ['bicep', 'build', '--file', 'infra/public-workloads.bicep', '--stdout'], { encoding: 'utf8' });
@@ -28,7 +28,7 @@ function preview() {
     const secrets = secretNames.map(secretName => ({
       name: secretName,
       identity,
-      keyVaultUrl: `https://kv-agentsdlc-dev-55eb.vault.azure.net/secrets/${secretName}`
+      keyVaultUrl: `https://kv-agentsdlc-dev-7c77.vault.azure.net/secrets/${secretName}`
     }));
     return {
       changeType: 'Create',

@@ -5,8 +5,8 @@ const { validate, validateAgainst } = require('../scripts/validate-foundation-ac
 
 const subscription = 'b6f10878-9f8a-4b3f-8bc5-3464cdd79c77';
 const root = `/subscriptions/${subscription}/resourceGroups/agtsdlc-dev-rg/providers`;
-const registry = `${root}/Microsoft.ContainerRegistry/registries/cragentsdlcdev55eb`;
-const vault = `${root}/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb`;
+const registry = `${root}/Microsoft.ContainerRegistry/registries/cragentsdlcdev7c77`;
+const vault = `${root}/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
 const roleRoot = `/subscriptions/${subscription}/providers/Microsoft.Authorization/roleDefinitions`;
 const ids = [1, 2, 3, 4, 5].map(i => `00000000-0000-0000-0000-00000000000${i}`);
 const deployer = '68b48a36-c15b-4e51-a9a5-f26e6b6a342b';
@@ -14,7 +14,7 @@ const deployer = '68b48a36-c15b-4e51-a9a5-f26e6b6a342b';
 function fixture() {
   const parameters = createParameters(ids);
   const changes = [registry, vault, ...['portal', 'apigw', 'orders', 'inventory', 'notify']
-    .map(name => `${root}/Microsoft.ManagedIdentity/userAssignedIdentities/ca-agentsdlc-dev-55eb-${name}-identity`)]
+    .map(name => `${root}/Microsoft.ManagedIdentity/userAssignedIdentities/ca-agentsdlc-dev-7c77-${name}-identity`)]
     .map(resourceId => ({ resourceId, changeType: 'Ignore', after: null }));
   function grant(scope, name, principalId, role, changeType) {
     const resourceId = `${scope}/providers/Microsoft.Authorization/roleAssignments/${name}`;

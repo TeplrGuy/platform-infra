@@ -74,7 +74,7 @@ azure account account show --output json |
 location="$(azure resource-group group show --name agtsdlc-dev-rg --query location --output tsv)"
 [[ "$location" == northeurope ]] || { echo "::error::The approved dev resource group is not in North Europe."; exit 1; }
 environment="$(azure environment resource show \
-  --ids "/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb" \
+  --ids "/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77" \
   --api-version 2026-07-01 --query '{state:properties.provisioningState,domain:properties.defaultDomain}' --output json)"
 [[ "$(jq -r '.state' <<< "$environment")" == Succeeded ]] || { echo "::error::The dev Container Apps environment is not ready."; exit 1; }
 domain="$(jq -er '.domain' <<< "$environment")"

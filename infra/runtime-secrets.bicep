@@ -4,7 +4,7 @@ targetScope = 'resourceGroup'
 param postgresAdminPassword string
 
 resource vault 'Microsoft.KeyVault/vaults@2026-05-15' existing = {
-  name: 'kv-agentsdlc-dev-55eb'
+  name: 'kv-agentsdlc-dev-7c77'
 }
 
 resource password 'Microsoft.KeyVault/vaults/secrets@2026-05-15' = {

@@ -27,11 +27,11 @@ echo '{"properties":{"template":{"containers":[{"image":"pinned-image"}]}}}' > h
 case "$1 $2 $3" in
   'containerapp show --name')
     if [[ "$*" == *"containers[0].image"* ]]; then
-      node -e 'const r=require("./infra/private-release.json");const name=process.argv[1].split("-").at(-1);const keys={portal:"portal",apigw:"apiGateway",orders:"orders",inventory:"inventory",notify:"notifications"};const s=r.services.find(x=>x.key===keys[name]);console.log(JSON.stringify({image:"cragentsdlcdev55eb.azurecr.io/"+s.name+"@"+s.digest,external:process.env.PUBLIC_PORTAL_EXPECTED==="true"&&name==="portal",state:"Succeeded"}));' "$4"
-    else echo ca-agentsdlc-dev-55eb-orders--abc123; fi ;;
+      node -e 'const r=require("./infra/private-release.json");const name=process.argv[1].split("-").at(-1);const keys={portal:"portal",apigw:"apiGateway",orders:"orders",inventory:"inventory",notify:"notifications"};const s=r.services.find(x=>x.key===keys[name]);console.log(JSON.stringify({image:"cragentsdlcdev7c77.azurecr.io/"+s.name+"@"+s.digest,external:process.env.PUBLIC_PORTAL_EXPECTED==="true"&&name==="portal",state:"Succeeded"}));' "$4"
+    else echo ca-agentsdlc-dev-7c77-orders--abc123; fi ;;
   'rest --method post')
     node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync("journey-request.json")).containers; if(c.length!==1 || c[0].image!=="pinned-image" || c[0].command[0]!=="node" || c[0].env.some(x=>x.secretRef)) process.exit(1); fs.appendFileSync("modes.log", c[0].env.find(x=>x.name==="JOURNEY_MODE").value+"\\n");'
-    echo job-agentsdlc-dev-55eb-health-ab123 ;;
+    echo job-agentsdlc-dev-7c77-health-ab123 ;;
   'containerapp job execution') echo Succeeded ;;
   'containerapp replica list')
     if [[ -f was-running ]]; then echo '[]'; else touch was-running; echo '[{"properties":{"runningState":"Running"}}]'; fi ;;

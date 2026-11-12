@@ -38,14 +38,14 @@ azure account account show --output json |
 location="$(azure resource-group group show --name agtsdlc-dev-rg --query location --output tsv)"
 [[ "$location" == northeurope ]] || { echo "::error::Resource group location changed."; exit 1; }
 scope="/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers"
-environment_id="$scope/Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb"
+environment_id="$scope/Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77"
 environment="$(azure environment resource show --ids "$environment_id" --api-version 2026-07-01 \
   --query '{state:properties.provisioningState,domain:properties.defaultDomain}' --output json)"
 [[ "$(jq -r '.state' <<< "$environment")" == Succeeded ]] || { echo "::error::Runtime environment is not ready."; exit 1; }
 domain="$(jq -er '.domain' <<< "$environment")"
-registry_server="$(azure registry resource show --ids "$scope/Microsoft.ContainerRegistry/registries/cragentsdlcdev55eb" --api-version 2025-11-01 --query properties.loginServer --output tsv)"
-vault_uri="$(azure vault resource show --ids "$scope/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb" --api-version 2026-05-15 --query properties.vaultUri --output tsv)"
-[[ "$registry_server" == cragentsdlcdev55eb.azurecr.io && "$vault_uri" == https://kv-agentsdlc-dev-55eb.vault.azure.net/ ]] ||
+registry_server="$(azure registry resource show --ids "$scope/Microsoft.ContainerRegistry/registries/cragentsdlcdev7c77" --api-version 2025-11-01 --query properties.loginServer --output tsv)"
+vault_uri="$(azure vault resource show --ids "$scope/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77" --api-version 2026-05-15 --query properties.vaultUri --output tsv)"
+[[ "$registry_server" == cragentsdlcdev7c77.azurecr.io && "$vault_uri" == https://kv-agentsdlc-dev-7c77.vault.azure.net/ ]] ||
   { echo "::error::Registry or vault endpoint differs from the approved target."; exit 1; }
 node scripts/private-preview.js parameters > private-parameters.json
 az bicep build --file infra/private-workloads.bicep --stdout > private-compiled.json
@@ -79,7 +79,7 @@ if [[ "$mode" == apply ]]; then
   node -e '
     const release = require("./infra/private-release.json");
     const names = require("./infra/foundation.parameters.json").parameters.appNames.value;
-    for (let i = 0; i < names.length; i++) console.log(`${names[i]}\tcragentsdlcdev55eb.azurecr.io/${release.services[i].name}@${release.services[i].digest}`);
+    for (let i = 0; i < names.length; i++) console.log(`${names[i]}\tcragentsdlcdev7c77.azurecr.io/${release.services[i].name}@${release.services[i].digest}`);
   ' | while IFS=$'\t' read -r name image; do
     azure "verify-$name" resource show --ids "$scope/Microsoft.App/containerApps/$name" --api-version 2026-07-01 \
       --query '{state:properties.provisioningState,external:properties.configuration.ingress.external,image:properties.template.containers[0].image}' --output json |

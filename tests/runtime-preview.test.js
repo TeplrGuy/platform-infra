@@ -3,7 +3,7 @@ const test = require('node:test');
 const { sanitize, validate, validateAgainst } = require('../scripts/runtime-preview');
 const tags = require('../infra/foundation.parameters.json').parameters.tags.value;
 const root = '/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/';
-const pg = 'Microsoft.DBforPostgreSQL/flexibleServers/pg-agentsdlc-dev-55eb';
+const pg = 'Microsoft.DBforPostgreSQL/flexibleServers/pg-agentsdlc-dev-7c77';
 
 function resource(path, type, properties, other = {}) {
   const id = root + path;
@@ -28,16 +28,16 @@ function core() {
     resource(`${pg}/firewallRules/AllowAllAzureServicesAndResourcesWithinAzureIps`, 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules', {
       startIpAddress: '0.0.0.0', endIpAddress: '0.0.0.0'
     }),
-    resource('Microsoft.OperationalInsights/workspaces/log-agentsdlc-dev-55eb', 'Microsoft.OperationalInsights/workspaces', {
+    resource('Microsoft.OperationalInsights/workspaces/log-agentsdlc-dev-7c77', 'Microsoft.OperationalInsights/workspaces', {
       sku: { name: 'PerGB2018' }, retentionInDays: 30
     }, located),
-    resource('Microsoft.Insights/components/appi-agentsdlc-dev-55eb', 'Microsoft.Insights/components', {
+    resource('Microsoft.Insights/components/appi-agentsdlc-dev-7c77', 'Microsoft.Insights/components', {
       Application_Type: 'web'
     }, located),
-    resource('Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb', 'Microsoft.App/managedEnvironments', {
+    resource('Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77', 'Microsoft.App/managedEnvironments', {
       appLogsConfiguration: { destination: 'log-analytics' }
     }, located),
-    resource('Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb/secrets/postgres-database-url', 'Microsoft.KeyVault/vaults/secrets', {
+    resource('Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77/secrets/postgres-database-url', 'Microsoft.KeyVault/vaults/secrets', {
       value: '[REDACTED]'
     })
   ] };
@@ -80,7 +80,7 @@ test('runtime preview enforces the approved database, telemetry and environment 
 
 test('credential seeding rejects overwrite, deletion and any other secret', () => {
   const preview = { status: 'Succeeded', changes: [
-    resource('Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb/secrets/postgres-admin-password',
+    resource('Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77/secrets/postgres-admin-password',
       'Microsoft.KeyVault/vaults/secrets', { value: '[REDACTED]' })
   ] };
   assert.doesNotThrow(() => validate(preview, 'secrets'));
@@ -107,7 +107,7 @@ test('runtime recovery changes only extensions and a new database URL', () => {
 });
 
 test('stored previews redact credentials, vault values and telemetry keys without hiding security settings', () => {
-  const password = 'Aa0_TestCredential55eb0123456789';
+  const password = 'Aa0_TestCredential7c770123456789';
   const input = {
     type: 'Microsoft.KeyVault/vaults/secrets',
     properties: { value: `postgresql://user:${password}@db`, enabled: true },
@@ -136,7 +136,7 @@ test('stored previews redact credentials, vault values and telemetry keys withou
   assert.equal(clean.configuration.secrets[0].value, '[REDACTED]');
   assert.equal(input.properties.value, `postgresql://user:${password}@db`);
   const secretChange = sanitize({
-    resourceId: `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb/secrets/postgres-database-url`,
+    resourceId: `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77/secrets/postgres-database-url`,
     before: { properties: { value: 'previous-unknown-credential' } },
     delta: [{ path: 'properties', before: { value: 'previous-unknown-credential' },
       after: { value: 'current-credential' } }]

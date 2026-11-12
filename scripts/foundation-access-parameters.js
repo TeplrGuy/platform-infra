@@ -8,8 +8,8 @@ function createParameters(principalIds) {
     $schema: 'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#',
     contentVersion: '1.0.0.0',
     parameters: {
-      registryName: { value: 'cragentsdlcdev55eb' },
-      keyVaultName: { value: 'kv-agentsdlc-dev-55eb' },
+      registryName: { value: 'cragentsdlcdev7c77' },
+      keyVaultName: { value: 'kv-agentsdlc-dev-7c77' },
       deployerObjectId: { value: '68b48a36-c15b-4e51-a9a5-f26e6b6a342b' },
       appPrincipalIds: { value: [...principalIds] }
     }

@@ -1,8 +1,8 @@
 targetScope = 'resourceGroup'
 
 param location string = 'northeurope'
-param environmentName string = 'agentsdlc-dev-55eb'
-param sessionId string = '55eb0364-fed8-4fc9-95e3-405ad428b06d'
+param environmentName string = 'agentsdlc-dev-7c77'
+param sessionId string = '7c770364-fed8-4fc9-95e3-405ad428b06d'
 param deployedBy string
 param createdAt string
 param deployerObjectId string
@@ -24,17 +24,17 @@ param containerImages object = {
   notifications: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 }
 param resourceNames object = {
-  environment: 'cae-agentsdlc-dev-55eb'
-  portal: 'ca-agentsdlc-dev-55eb-portal'
-  apiGateway: 'ca-agentsdlc-dev-55eb-apigw'
-  orders: 'ca-agentsdlc-dev-55eb-orders'
-  inventory: 'ca-agentsdlc-dev-55eb-inventory'
-  notifications: 'ca-agentsdlc-dev-55eb-notify'
-  registry: 'cragentsdlcdev55eb'
-  postgres: 'pg-agentsdlc-dev-55eb'
-  keyVault: 'kv-agentsdlc-dev-55eb'
-  logAnalytics: 'log-agentsdlc-dev-55eb'
-  appInsights: 'appi-agentsdlc-dev-55eb'
+  environment: 'cae-agentsdlc-dev-7c77'
+  portal: 'ca-agentsdlc-dev-7c77-portal'
+  apiGateway: 'ca-agentsdlc-dev-7c77-apigw'
+  orders: 'ca-agentsdlc-dev-7c77-orders'
+  inventory: 'ca-agentsdlc-dev-7c77-inventory'
+  notifications: 'ca-agentsdlc-dev-7c77-notify'
+  registry: 'cragentsdlcdev7c77'
+  postgres: 'pg-agentsdlc-dev-7c77'
+  keyVault: 'kv-agentsdlc-dev-7c77'
+  logAnalytics: 'log-agentsdlc-dev-7c77'
+  appInsights: 'appi-agentsdlc-dev-7c77'
 }
 
 var enableEntraAuth = !empty(entraClientId) && !empty(entraClientSecret)

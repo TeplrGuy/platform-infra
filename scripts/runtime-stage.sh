@@ -36,7 +36,7 @@ location="$(azure resource-group group show --name agtsdlc-dev-rg --query locati
 [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || { echo "::error::The checkout is not the workflow revision."; exit 1; }
 
 credential_state() {
-  azure credential-metadata keyvault secret list --vault-name kv-agentsdlc-dev-55eb --output json |
+  azure credential-metadata keyvault secret list --vault-name kv-agentsdlc-dev-7c77 --output json |
     jq -er '[.[] | select(.name == "postgres-admin-password")] |
       if length == 0 then "missing"
       elif length == 1 and .[0].attributes.enabled == true then "exists"
@@ -46,7 +46,7 @@ credential_state() {
 require_new_database() {
   local existing
   existing="$(azure database-discovery postgres flexible-server list --resource-group agtsdlc-dev-rg \
-    --query "[?name=='pg-agentsdlc-dev-55eb'].name" --output tsv)"
+    --query "[?name=='pg-agentsdlc-dev-7c77'].name" --output tsv)"
   [[ -z "$existing" ]] || {
     echo "::error::The database exists without its recorded administrator credential. Refusing to generate or reset it."
     exit 1
@@ -56,9 +56,9 @@ require_new_database() {
 load_password() {
   [[ "$(credential_state)" == exists ]] || { echo "::error::The database credential seed has not completed."; exit 1; }
   local id
-  id="$(azure credential-version keyvault secret show --vault-name kv-agentsdlc-dev-55eb \
+  id="$(azure credential-version keyvault secret show --vault-name kv-agentsdlc-dev-7c77 \
     --name postgres-admin-password --query id --output tsv)"
-  [[ "$id" =~ ^https://kv-agentsdlc-dev-55eb.vault.azure.net/secrets/postgres-admin-password/[a-f0-9]{32}$ ]] || {
+  [[ "$id" =~ ^https://kv-agentsdlc-dev-7c77.vault.azure.net/secrets/postgres-admin-password/[a-f0-9]{32}$ ]] || {
     echo "::error::The database credential version is unresolved."
     exit 1
   }
@@ -107,14 +107,14 @@ case "$mode" in
     else
       require_new_database
       echo "seed_required=true" >> "$GITHUB_OUTPUT"
-      export POSTGRES_ADMIN_PASSWORD=PreviewOnly_NotAnActualCredential55eb0123456789
+      export POSTGRES_ADMIN_PASSWORD=PreviewOnly_NotAnActualCredential7c770123456789
       preview secrets infra/runtime-secrets.bicepparam
     fi
     ;;
   secrets-apply)
     [[ "$(credential_state)" == missing ]] || { echo "::error::Credential state changed after approval."; exit 1; }
     require_new_database
-    export POSTGRES_ADMIN_PASSWORD=PreviewOnly_NotAnActualCredential55eb0123456789
+    export POSTGRES_ADMIN_PASSWORD=PreviewOnly_NotAnActualCredential7c770123456789
     preview secrets infra/runtime-secrets.bicepparam
     sha256sum --check approved-runtime/runtime-template.sha256
     node scripts/runtime-preview.js secrets runtime-what-if.json approved-runtime/runtime-what-if.json
@@ -136,7 +136,7 @@ case "$mode" in
   recovery-preview|recovery-apply)
     load_password
     azure server-discovery postgres flexible-server show --resource-group agtsdlc-dev-rg \
-      --name pg-agentsdlc-dev-55eb --query '{state:state,administratorLogin:administratorLogin,version:version}' --output json |
+      --name pg-agentsdlc-dev-7c77 --query '{state:state,administratorLogin:administratorLogin,version:version}' --output json |
       node -e 'let s=""; process.stdin.on("data", c => s+=c).on("end", () => {
         const p=JSON.parse(s);
         if (p.state !== "Ready" || p.administratorLogin !== "agenticsadmin" || p.version !== "16")

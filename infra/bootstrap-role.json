@@ -1,5 +1,5 @@
 {
-  "Name": "Agentic SDLC Dev RG Bootstrap 55eb",
+  "Name": "Agentic SDLC Dev RG Bootstrap 7c77",
   "IsCustom": true,
   "Description": "Create or update resource groups and run ARM deployments for the demo bootstrap. Grants no workload resource or role assignment permissions.",
   "Actions": [

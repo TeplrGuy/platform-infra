@@ -4,8 +4,8 @@ const { createParameters } = require('./foundation-access-parameters');
 
 const subscription = 'b6f10878-9f8a-4b3f-8bc5-3464cdd79c77';
 const root = `/subscriptions/${subscription}/resourceGroups/agtsdlc-dev-rg/providers`;
-const registry = `${root}/Microsoft.ContainerRegistry/registries/cragentsdlcdev55eb`;
-const vault = `${root}/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb`;
+const registry = `${root}/Microsoft.ContainerRegistry/registries/cragentsdlcdev7c77`;
+const vault = `${root}/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
 const roleRoot = `/subscriptions/${subscription}/providers/Microsoft.Authorization/roleDefinitions`;
 const acrPull = `${roleRoot}/7f951dda-4ed3-4680-a7ca-43fe172d538d`;
 const secretUser = `${roleRoot}/4633458b-17de-408a-b874-0445c86b69e6`;
@@ -15,7 +15,7 @@ const unchanged = new Map([
   [`${vault}/providers/Microsoft.Authorization/roleAssignments/a248f7fa-c840-53f1-bb9d-311671c2f582`.toLowerCase(), `${roleRoot}/b86a8fe4-44ce-4948-aee5-eccb2c155cd7`.toLowerCase()]
 ]);
 const ignored = new Set([registry, vault, ...['portal', 'apigw', 'orders', 'inventory', 'notify']
-  .map(name => `${root}/Microsoft.ManagedIdentity/userAssignedIdentities/ca-agentsdlc-dev-55eb-${name}-identity`)]
+  .map(name => `${root}/Microsoft.ManagedIdentity/userAssignedIdentities/ca-agentsdlc-dev-7c77-${name}-identity`)]
   .map(id => id.toLowerCase()));
 
 function validate(preview, parameters) {

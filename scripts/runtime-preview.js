@@ -3,11 +3,11 @@ const { isDeepStrictEqual } = require('node:util');
 const foundation = require('../infra/foundation.parameters.json').parameters;
 
 const root = '/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/';
-const pg = `${root}Microsoft.DBforPostgreSQL/flexibleServers/pg-agentsdlc-dev-55eb`;
-const vault = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb`;
-const log = `${root}Microsoft.OperationalInsights/workspaces/log-agentsdlc-dev-55eb`;
-const insights = `${root}Microsoft.Insights/components/appi-agentsdlc-dev-55eb`;
-const environment = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb`;
+const pg = `${root}Microsoft.DBforPostgreSQL/flexibleServers/pg-agentsdlc-dev-7c77`;
+const vault = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
+const log = `${root}Microsoft.OperationalInsights/workspaces/log-agentsdlc-dev-7c77`;
+const insights = `${root}Microsoft.Insights/components/appi-agentsdlc-dev-7c77`;
+const environment = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77`;
 const credential = `${vault}/secrets/postgres-admin-password`;
 const databaseUrl = `${vault}/secrets/postgres-database-url`;
 
