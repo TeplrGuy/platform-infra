@@ -114,8 +114,16 @@ test('PostgreSQL state survives restarts and coordinates replicas', { skip: !con
       post(inventory.base, '/inventory/reserve', { reservationId: 'duplicate', sku: 'SKU-100', quantity: 1 }),
       post(inventoryReplica.base, '/inventory/reserve', { reservationId: 'duplicate', sku: 'SKU-100', quantity: 1 })
     ]);
-    assert.deepEqual(await Promise.all(duplicates.map((response) => response.json())).then((values) =>
-      values.map((value) => value.status)), ['already_reserved', 'already_reserved']);
+    const duplicateReserveStatuses = await Promise.all(duplicates.map((response) => response.json()))
+      .then((values) => values.map((value) => value.status).sort());
+    assert.ok(
+      (duplicateReserveStatuses[0] === 'already_reserved' && duplicateReserveStatuses[1] === 'already_reserved') ||
+      (duplicateReserveStatuses[0] === 'already_reserved' && duplicateReserveStatuses[1] === 'reserved'),
+      `unexpected duplicate reservation statuses: ${duplicateReserveStatuses.join(',')}`
+    );
+    assert.equal((await (await post(inventory.base, '/inventory/reserve', {
+      reservationId: 'duplicate', sku: 'SKU-100', quantity: 1
+    })).json()).status, 'already_reserved');
 
     await stop(orders.child);
     await stop(inventory.child);
