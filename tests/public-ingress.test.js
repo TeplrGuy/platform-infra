@@ -108,3 +108,15 @@ test('application identities and access exist before the apps that use them', ()
     "[reference('identities').outputs.principalIds.value[4]]"
   ]);
 });
+
+test('foundation access references existing identities and grants the application roles', () => {
+  const template = getTemplate('infra/foundation-access.bicep');
+  const resources = Object.values(template.resources);
+  assert.equal(resources.length, 1);
+  assert.equal(resources[0].name, 'foundation-application-access');
+  const params = resources[0].properties.parameters;
+  const principalIds = params.appPrincipalIds.value;
+  assert.equal(principalIds.length, 5);
+  assert.ok(principalIds.every(id => id.includes('reference(')));
+  assert.deepEqual(params.secretPrincipalIds.value, [0, 2, 3, 4].map(index => principalIds[index]));
+});

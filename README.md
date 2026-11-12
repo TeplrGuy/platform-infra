@@ -86,8 +86,9 @@ creating application revisions. This parameter is not a release pipeline.
 `infra/foundation.bicep` contains the registry, vault, application identities,
 and deployer access without creating application or database resources. Its
 first-stage preview omits application role assignments, whose principal IDs
-are unknown until the identities exist. A later protected stage must preview
-and apply those assignments before any application release. The
+are unknown until the identities exist. `infra/foundation-access.bicep`
+references those existing identities for a later access stage. A protected
+pipeline must still preview and apply those assignments before any application release. The
 `preview_foundation` input runs a read-only what-if; it does not apply the
 foundation.
 The test, production, and rollback workflows remain blocked and must be
