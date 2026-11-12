@@ -17,14 +17,15 @@ function sanitize(value, password = '', secretContext = false) {
   if (!value || typeof value !== 'object') return value;
   const secret = secretContext || /\/secrets$/i.test(value.type || '') ||
     /\/vaults\/[^/]+\/secrets\/[^/]+$/i.test(value.resourceId || '');
-  const secretDelta = /(administratorLoginPassword|sharedKey|connectionString|instrumentationKey|^properties\.value$)/i.test(value.path || '');
+  const telemetryEnvironment = value.name === 'APPLICATIONINSIGHTS_CONNECTION_STRING';
+  const secretDelta = /(administratorLoginPassword|sharedKey|connectionString|instrumentationKey|^properties\.value$|(?:^|\.)env(?:\[|\.|$))/i.test(value.path || '');
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [
     key,
     (secretDelta && ['before', 'after'].includes(key)) ||
       /^(administratorLoginPassword|sharedKey|connectionString|instrumentationKey)$/i.test(key) ||
-      (key === 'value' && secret)
+      (key === 'value' && (secret || telemetryEnvironment))
       ? '[REDACTED]'
-      : sanitize(item, password, secret)
+      : sanitize(item, password, secret || key === 'secrets')
   ]));
 }
 

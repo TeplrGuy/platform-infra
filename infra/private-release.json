@@ -1,0 +1,10 @@
+{
+  "publisherRun": "43133264052",
+  "services": [
+    { "name": "portal-web", "key": "portal", "refEnv": "PORTAL_REF", "revision": "909e5b86a202024fb6c9bf072c0c6dc357ecd917", "digest": "sha256:1c6b9c4b2a33ffbe23f87893393850dda6e6b87ecca86ee04ba5ea0df73ff09a" },
+    { "name": "api-gateway", "key": "apiGateway", "refEnv": "GATEWAY_REF", "revision": "83dac082f160da300faf71a4178221ac1342ff50", "digest": "sha256:73e10fcd086a0d7ca7404323d7f4d545da71fda31cf94f67f643a6a5b8dc27ce" },
+    { "name": "orders-service", "key": "orders", "refEnv": "ORDERS_REF", "revision": "3dfdf891c0f5fe1da51cd59db6fb24672665ec94", "digest": "sha256:12b4f2d6cd883d6cb6d89efe23c789d4f6c26171c7aa517d42f6915f3f504ee1" },
+    { "name": "inventory-service", "key": "inventory", "refEnv": "INVENTORY_REF", "revision": "22fe924aa6581d1d88960dce11b8e919f10e4415", "digest": "sha256:496ac4771fd5e5f33cfb889038c4b07ccf55fd37126438ebdcb0fecd35c595f4" },
+    { "name": "notifications-service", "key": "notifications", "refEnv": "NOTIFICATIONS_REF", "revision": "1fe9a2fdd53e8ca9a4796dc5f11bcf2365360919", "digest": "sha256:fff81bc472eeaf9b08de6b35f77771f207c89cfb37ce063e31991c93117dd72c" }
+  ]
+}

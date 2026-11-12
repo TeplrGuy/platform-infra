@@ -126,9 +126,12 @@ previews and applies only the PostgreSQL extension setting and a new database
 URL secret. It checks that the existing server is ready with the expected
 administrator and reuses the recorded credential version; it refuses to
 overwrite an existing database URL. It never redeploys the server or database.
-`infra/private-workloads.bicep` is an unconnected private-only workload
-template, not an enabled release path; reviewed digest provenance, protected
-promotion and in-environment health gates are still required.
+`foundation_action: private-preview` performs a read-only what-if for five
+internal workloads using the exact source revisions and registry digests from
+publisher run 43133264052. It verifies private ingress, scoped identities,
+image digests, service URLs and database secret references, and redacts telemetry
+credentials before storing the preview. It does not deploy workloads;
+protected promotion and in-environment health gates are still required.
 The test, production, and rollback workflows remain blocked and must be
 adapted to resource-group-scope deployment and verified before enabling them.
 `infra/rg-rbac-condition.txt` is a proposed Azure RBAC condition for scoped

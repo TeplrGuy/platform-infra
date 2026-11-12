@@ -57,6 +57,7 @@ on:
           - publish-images
           - runtime-apply
           - runtime-recovery
+          - private-preview
 
 permissions:
   contents: read
@@ -303,7 +304,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js tests/verify-image-artifact.test.js tests/foundation-access-parameters.test.js tests/validate-foundation-access-preview.test.js tests/runtime-preview.test.js
+      - run: node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js tests/verify-image-artifact.test.js tests/foundation-access-parameters.test.js tests/validate-foundation-access-preview.test.js tests/runtime-preview.test.js tests/private-preview.test.js
   quality:
     needs: validate-inputs
     uses: ./.github/workflows/full-stack-e2e.yml
@@ -872,6 +873,45 @@ jobs:
             runtime-what-if.json
             runtime-template.sha256
             runtime-credential-id.txt
+          if-no-files-found: warn
+  preview-private-workloads:
+    if: ${{ inputs.foundation_action == 'private-preview' }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 20
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview the five private workloads without deploying
+        env:
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+        run: bash scripts/private-preview.sh
+      - name: Preserve redacted private workload preview
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: private-preview-${{ github.run_id }}
+          path: |
+            private-preview-audit.log
+            private-parameters.json
+            private-what-if.json
+            private-domain.txt
+            private-template.sha256
           if-no-files-found: warn
   block-unsafe-release:
     if: ${{ !inputs.bootstrap_rg }}

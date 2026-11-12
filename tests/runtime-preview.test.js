@@ -113,20 +113,27 @@ test('stored previews redact credentials, vault values and telemetry keys withou
     properties: { value: `postgresql://user:${password}@db`, enabled: true },
     nested: { administratorLoginPassword: password, sharedKey: 'key', connectionString: 'ikey',
       version: '16', publicNetworkAccess: 'Enabled', message: `contains ${password}` },
+    env: [{ name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: 'InstrumentationKey=secret' }],
     delta: [{ path: 'properties.appLogsConfiguration.logAnalyticsConfiguration.sharedKey',
-      propertyChangeType: 'Modify', before: 'old-key', after: 'new-key' }]
+      propertyChangeType: 'Modify', before: 'old-key', after: 'new-key' },
+    { path: 'properties.template.containers[0].env[2].value', before: 'old-connection', after: 'new-connection' }],
+    configuration: { secrets: [{ name: 'future-secret', value: 'future-value' }] }
   };
   const clean = sanitize(input, password);
   assert.equal(clean.properties.value, '[REDACTED]');
   assert.equal(clean.properties.enabled, true);
   assert.equal(clean.nested.version, '16');
   assert.equal(clean.nested.publicNetworkAccess, 'Enabled');
+  assert.equal(clean.env[0].value, '[REDACTED]');
   assert.ok(!JSON.stringify(clean).includes(password));
   for (const key of ['administratorLoginPassword', 'sharedKey', 'connectionString']) {
     assert.equal(clean.nested[key], '[REDACTED]');
   }
   assert.equal(clean.delta[0].before, '[REDACTED]');
   assert.equal(clean.delta[0].after, '[REDACTED]');
+  assert.equal(clean.delta[1].before, '[REDACTED]');
+  assert.equal(clean.delta[1].after, '[REDACTED]');
+  assert.equal(clean.configuration.secrets[0].value, '[REDACTED]');
   assert.equal(input.properties.value, `postgresql://user:${password}@db`);
   const secretChange = sanitize({
     resourceId: `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb/secrets/postgres-database-url`,
