@@ -90,7 +90,10 @@ are unknown until the identities exist. `infra/foundation-access.bicep`
 references those existing identities for a later access stage. A protected
 pipeline must still preview and apply those assignments before any application release. The
 `preview_foundation` input runs a read-only what-if; it does not apply the
-foundation.
+foundation. The preview validator accepts only the nine approved initial
+creations and can compare a post-approval recheck against the reviewed preview.
+It intentionally rejects retries against an already-created foundation; a safe
+reconciliation path is still required.
 The test, production, and rollback workflows remain blocked and must be
 adapted to resource-group-scope deployment and verified before enabling them.
 `infra/rg-rbac-condition.txt` is a proposed Azure RBAC condition for scoped
