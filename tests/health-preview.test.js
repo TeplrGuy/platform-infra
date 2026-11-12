@@ -88,6 +88,8 @@ case "$1 $2 $3" in
   'bicep build --file') echo '{}' ;;
   'deployment group what-if') cat "$TEST_PREVIEW" ;;
   'deployment group create') touch "$TEST_WRITTEN"; echo Succeeded ;;
+  'containerapp job start') touch "$TEST_STARTED"; echo job-agentsdlc-dev-55eb-health-ab123 ;;
+  'containerapp job execution') echo "\${TEST_STATUS:-Succeeded}" ;;
   *) echo "Unexpected Azure command" >&2; exit 1 ;;
 esac
 `);
@@ -100,18 +102,20 @@ esac
     const previewFile = path.join(tmp, 'what-if-fixture.json');
     const liveFile = path.join(tmp, 'live-fixture.json');
     const written = path.join(tmp, 'azure-write');
+    const started = path.join(tmp, 'job-started');
     const baseline = preview();
     writeFileSync(previewFile, JSON.stringify(baseline));
     const live = structuredClone(baseline.changes[0].after);
     live.properties.provisioningState = 'Succeeded';
+    live.location = 'North Europe';
     writeFileSync(liveFile, JSON.stringify(live));
     const env = { ...process.env, GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'TeplrGuy/platform-infra',
       GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_RUN_ID: '123', GITHUB_SHA: 'a'.repeat(40),
       TEST_DOMAIN: domain, TEST_PREVIEW: unix(previewFile), TEST_LIVE: unix(liveFile),
-      TEST_WRITTEN: unix(written), TEST_BIN: unix(bin), TEST_ROOT: unix(tmp) };
-    const run = mode => spawnSync('bash', ['-c',
+      TEST_WRITTEN: unix(written), TEST_STARTED: unix(started), TEST_BIN: unix(bin), TEST_ROOT: unix(tmp) };
+    const run = (mode, extra = {}) => spawnSync('bash', ['-c',
       'export PATH="$TEST_BIN:$PATH"; cd "$TEST_ROOT"; bash scripts/health-stage.sh "$1"', '_', mode],
-    { env, encoding: 'utf8' });
+    { env: { ...env, ...extra }, encoding: 'utf8' });
     const first = run('preview');
     assert.equal(first.status, 0, first.stderr);
     const approved = path.join(tmp, 'approved-health');
@@ -130,6 +134,19 @@ esac
     const accepted = run('apply');
     assert.equal(accepted.status, 0, accepted.stderr);
     assert.equal(existsSync(written), true);
+    const unsafe = structuredClone(live);
+    unsafe.properties.template.containers[0].image = 'unreviewed';
+    writeFileSync(liveFile, JSON.stringify(unsafe));
+    const rejectedRun = run('run');
+    assert.notEqual(rejectedRun.status, 0);
+    assert.equal(existsSync(started), false);
+    writeFileSync(liveFile, JSON.stringify(live));
+    const acceptedRun = run('run');
+    assert.equal(acceptedRun.status, 0, acceptedRun.stderr);
+    assert.equal(existsSync(started), true);
+    const failedRun = run('run', { TEST_STATUS: 'Failed' });
+    assert.notEqual(failedRun.status, 0);
+    assert.match(failedRun.stdout + failedRun.stderr, /ended with status Failed/);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

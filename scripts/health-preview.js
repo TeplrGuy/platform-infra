@@ -25,7 +25,7 @@ function validate(preview, domain, source) {
     }
     job = change.after;
   }
-  if (!job || job.location !== 'northeurope' || job.identity?.type !== 'UserAssigned' ||
+  if (!job || job.location?.replace(/\s/g, '').toLowerCase() !== 'northeurope' || job.identity?.type !== 'UserAssigned' ||
       !isDeepStrictEqual(Object.keys(job.identity.userAssignedIdentities || {}).map(x => x.toLowerCase()), [identityId.toLowerCase()]) ||
       job.properties?.environmentId?.toLowerCase() !== environmentId.toLowerCase()) throw Error('Health job scope or identity changed.');
   for (const [key, value] of Object.entries(foundation.tags.value)) {

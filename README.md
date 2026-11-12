@@ -149,6 +149,9 @@ environment. Preview alone neither creates nor runs the job.
 `foundation_action: health-apply` uses a separate protected approval and
 matching recheck to create the job, then validates its Azure readback. It does
 not start the job or prove application health.
+`foundation_action: health-run` validates the existing job's deployed image,
+identity and probe code, then starts its read-only checks from the private
+environment and fails if the execution fails or times out.
 The test, production, and rollback workflows remain blocked and must be
 adapted to resource-group-scope deployment and verified before enabling them.
 `infra/rg-rbac-condition.txt` is a proposed Azure RBAC condition for scoped

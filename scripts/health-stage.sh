@@ -2,7 +2,7 @@
 set -euo pipefail
 
 mode="${1:-preview}"
-[[ "$mode" == preview || "$mode" == apply ]] || { echo "::error::Unknown health job stage."; exit 1; }
+[[ "$mode" == preview || "$mode" == apply || "$mode" == run ]] || { echo "::error::Unknown health job stage."; exit 1; }
 if [[ "${GITHUB_ACTIONS:-}" != true || "${GITHUB_REPOSITORY:-}" != TeplrGuy/platform-infra ||
       "${GITHUB_EVENT_NAME:-}" != workflow_dispatch ]]; then
   echo "::error::Private health preview requires the protected GitHub Actions workflow."
@@ -37,6 +37,42 @@ environment="$(azure environment resource show --ids "$scope/Microsoft.App/manag
   --api-version 2026-07-01 --query '{state:properties.provisioningState,domain:properties.defaultDomain}' --output json)"
 [[ "$(jq -r '.state' <<< "$environment")" == Succeeded ]] || { echo "::error::Runtime environment is not ready."; exit 1; }
 domain="$(jq -er '.domain' <<< "$environment")"
+
+readback() {
+  azure health-readback resource show --ids "$scope/Microsoft.App/jobs/job-agentsdlc-dev-55eb-health" \
+    --api-version 2026-07-01 --output json |
+    node scripts/runtime-preview.js sanitize > health-live.json
+  node -e '
+    const fs = require("node:fs");
+    const job = JSON.parse(fs.readFileSync("health-live.json", "utf8"));
+    if (job.properties?.provisioningState !== "Succeeded") throw Error("The health job is not provisioned.");
+    require("./scripts/health-preview").validate(
+      {status:"Succeeded", changes:[{changeType:"Create", resourceId:job.id, after:job}]},
+      process.argv[1], fs.readFileSync("scripts/private-health.js", "utf8"));
+  ' "$domain"
+}
+
+if [[ "$mode" == run ]]; then
+  readback
+  execution="$(azure health-start containerapp job start --name job-agentsdlc-dev-55eb-health \
+    --resource-group agtsdlc-dev-rg --query name --output tsv)"
+  [[ "$execution" =~ ^job-agentsdlc-dev-55eb-health-[a-z0-9]+$ ]] ||
+    { echo "::error::Health job execution identifier is unexpected."; exit 1; }
+  printf '%s\n' "$execution" > health-execution.txt
+  for ((attempt=0; attempt<72; attempt++)); do
+    status="$(azure health-status containerapp job execution show --name job-agentsdlc-dev-55eb-health \
+      --resource-group agtsdlc-dev-rg --job-execution-name "$execution" --query properties.status --output tsv)"
+    case "$status" in
+      Succeeded) audit "health execution succeeded execution=$execution"; exit 0 ;;
+      Failed|Stopped) echo "::error::Health execution $execution ended with status $status."; exit 1 ;;
+      Running|Processing|Pending) sleep 10 ;;
+      *) echo "::error::Unexpected health execution status: $status"; exit 1 ;;
+    esac
+  done
+  echo "::error::Health execution $execution did not complete within the polling window."
+  exit 1
+fi
+
 az bicep build --file infra/private-health.bicep --stdout > health-compiled.json
 azure health-what-if deployment group what-if --name "health-preview-$GITHUB_RUN_ID" \
   --resource-group agtsdlc-dev-rg --template-file health-compiled.json --no-pretty-print --no-prompt --output json |
@@ -61,16 +97,6 @@ if [[ "$mode" == apply ]]; then
     exit 1
   fi
   [[ "$state" == Succeeded ]] || { echo "::error::Private health job deployment did not succeed."; exit 1; }
-  azure health-readback resource show --ids "$scope/Microsoft.App/jobs/job-agentsdlc-dev-55eb-health" \
-    --api-version 2026-07-01 --output json |
-    node scripts/runtime-preview.js sanitize > health-live.json
-  node -e '
-    const fs = require("node:fs");
-    const job = JSON.parse(fs.readFileSync("health-live.json", "utf8"));
-    if (job.properties?.provisioningState !== "Succeeded") throw Error("The health job is not provisioned.");
-    require("./scripts/health-preview").validate(
-      {status:"Succeeded", changes:[{changeType:"Create", resourceId:job.id, after:job}]},
-      process.argv[1], fs.readFileSync("scripts/private-health.js", "utf8"));
-  ' "$domain"
+  readback
   audit "health job deployed and validated; execution has not started"
 fi
