@@ -62,10 +62,10 @@ function validate(preview, domain, refs, template) {
     if (!id || !id.startsWith(root.toLowerCase()) || seen.has(id)) throw Error('Duplicate or out-of-scope resource.');
     seen.add(id);
     if (change.changeType === 'Ignore') continue;
-    if (!expected.has(id) || change.changeType !== 'Create' ||
+    if (!expected.has(id) || !['Create', 'Modify'].includes(change.changeType) ||
         change.after?.id?.toLowerCase() !== id ||
         change.after?.type?.toLowerCase() !== 'microsoft.app/containerapps') {
-      throw Error('Only creation of the five intended Container Apps is allowed.');
+      throw Error('Only create or modify operations for the five intended Container Apps are allowed.');
     }
     const i = expected.get(id);
     const app = change.after;
