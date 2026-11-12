@@ -2,7 +2,7 @@
 set -euo pipefail
 
 mode="${1:-preview}"
-[[ "$mode" == preview || "$mode" == apply || "$mode" == run ]] || { echo "::error::Unknown health job stage."; exit 1; }
+[[ "$mode" == preview || "$mode" == apply || "$mode" == run || "$mode" == verify ]] || { echo "::error::Unknown health job stage."; exit 1; }
 if [[ "${GITHUB_ACTIONS:-}" != true || "${GITHUB_REPOSITORY:-}" != TeplrGuy/platform-infra ||
       "${GITHUB_EVENT_NAME:-}" != workflow_dispatch ]]; then
   echo "::error::Private health preview requires the protected GitHub Actions workflow."
@@ -51,6 +51,12 @@ readback() {
       process.argv[1], fs.readFileSync("scripts/private-health.js", "utf8"));
   ' "$domain"
 }
+
+if [[ "$mode" == verify ]]; then
+  readback
+  printf '%s\n' "$domain" > health-domain.txt
+  exit 0
+fi
 
 if [[ "$mode" == run ]]; then
   readback

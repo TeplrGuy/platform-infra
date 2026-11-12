@@ -62,6 +62,7 @@ on:
           - health-preview
           - health-apply
           - health-run
+          - journey-run
 
 permissions:
   contents: read
@@ -308,7 +309,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js tests/verify-image-artifact.test.js tests/foundation-access-parameters.test.js tests/validate-foundation-access-preview.test.js tests/runtime-preview.test.js tests/private-preview.test.js tests/private-health.test.js tests/health-preview.test.js
+      - run: node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js tests/verify-image-artifact.test.js tests/foundation-access-parameters.test.js tests/validate-foundation-access-preview.test.js tests/runtime-preview.test.js tests/private-preview.test.js tests/private-health.test.js tests/health-preview.test.js tests/private-journey.test.js tests/journey-stage.test.js
   quality:
     needs: validate-inputs
     uses: ./.github/workflows/full-stack-e2e.yml
@@ -1071,6 +1072,48 @@ jobs:
             health-audit.log
             health-live.json
             health-execution.txt
+          if-no-files-found: warn
+  run-private-journey:
+    if: ${{ inputs.foundation_action == 'journey-run' }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-24.04
+    environment: dev
+    timeout-minutes: 45
+    concurrency:
+      group: agentsdlc-dev-55eb-runtime-apply
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Run one synthetic order and verify it after scale-to-zero
+        env:
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+        run: bash scripts/journey-stage.sh
+      - name: Preserve redacted journey evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: journey-run-${{ github.run_id }}
+          path: |
+            health-audit.log
+            health-live.json
+            journey-audit.log
+            journey-executions.txt
           if-no-files-found: warn
   block-unsafe-release:
     if: ${{ !inputs.bootstrap_rg }}
