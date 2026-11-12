@@ -93,7 +93,7 @@ creating application revisions. This parameter is not a release pipeline.
 and deployer access without creating application or database resources. Its
 first-stage preview omits application role assignments, whose principal IDs
 are unknown until the identities exist. `infra/foundation-access.bicep`
-references those existing identities for a later access stage. A protected
+accepts principal IDs from those existing identities for a later access stage. A protected
 pipeline must still preview and apply those assignments before any application release. The
 `foundation_action: preview` runs a read-only what-if.
 `foundation_action: apply` requires the preview, full quality gates and a

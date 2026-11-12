@@ -52,6 +52,7 @@ on:
           - none
           - preview
           - apply
+          - access-preview
 
 permissions:
   contents: read
@@ -116,6 +117,73 @@ jobs:
           path: |
             foundation-audit.log
             foundation-what-if.json
+          if-no-files-found: warn
+  preview-foundation-access:
+    if: ${{ inputs.foundation_action == 'access-preview' }}
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Preview application identity access
+        env:
+          TARGET_CLIENT: ${{ vars.AZURE_CLIENT_ID }}
+          TARGET_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TARGET_TENANT: ${{ vars.AZURE_TENANT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
+                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
+                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+            echo "::error::The identity, tenant, or subscription does not match the approved target."
+            exit 1
+          fi
+          echo "started identity discovery run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee access-preview-audit.log
+          ids=()
+          for name in portal apigw orders inventory notify; do
+            if principal="$(az identity show --subscription "$TARGET_SUBSCRIPTION" \
+              --resource-group agtsdlc-dev-rg --name "ca-agentsdlc-dev-55eb-$name-identity" \
+              --query principalId --output tsv)"; then
+              ids+=("$principal")
+            else
+              echo "failed identity discovery for $name" | tee -a access-preview-audit.log
+              exit 1
+            fi
+          done
+          echo "succeeded identity discovery" | tee -a access-preview-audit.log
+          node scripts/foundation-access-parameters.js "${ids[@]}" > foundation-access-parameters.json
+          echo "started access what-if run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee -a access-preview-audit.log
+          if az deployment group what-if \
+            --name "foundation-access-preview-$GITHUB_RUN_ID" \
+            --resource-group agtsdlc-dev-rg \
+            --template-file infra/foundation-access.bicep \
+            --parameters @foundation-access-parameters.json \
+            --no-pretty-print --no-prompt --output json > foundation-access-what-if.json; then
+            echo "succeeded access what-if" | tee -a access-preview-audit.log
+          else
+            code=$?
+            echo "failed access what-if exit=$code" | tee -a access-preview-audit.log
+            exit "$code"
+          fi
+      - name: Preserve access preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundation-access-preview-${{ github.run_id }}
+          path: |
+            access-preview-audit.log
+            foundation-access-parameters.json
+            foundation-access-what-if.json
           if-no-files-found: warn
   preview-bootstrap:
     if: ${{ inputs.preview_bootstrap || inputs.bootstrap_rg }}
@@ -220,7 +288,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js tests/verify-image-artifact.test.js
+      - run: node --test tests/public-ingress.test.js tests/validate-rg-preview.test.js tests/validate-foundation-preview.test.js tests/verify-image-artifact.test.js tests/foundation-access-parameters.test.js
   quality:
     needs: validate-inputs
     uses: ./.github/workflows/full-stack-e2e.yml
