@@ -95,8 +95,10 @@ first-stage preview omits application role assignments, whose principal IDs
 are unknown until the identities exist. `infra/foundation-access.bicep`
 references those existing identities for a later access stage. A protected
 pipeline must still preview and apply those assignments before any application release. The
-`preview_foundation` input runs a read-only what-if; it does not apply the
-foundation. The preview validator accepts only the nine approved initial
+`foundation_action: preview` runs a read-only what-if.
+`foundation_action: apply` requires the preview, full quality gates and a
+separate protected environment approval; it rechecks the approved preview
+before applying only the foundation. The preview validator accepts only the nine approved initial
 creations and can compare a post-approval recheck against the reviewed preview.
 It intentionally rejects retries against an already-created foundation; a safe
 reconciliation path is still required.

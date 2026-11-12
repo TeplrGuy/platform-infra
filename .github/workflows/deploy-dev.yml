@@ -43,18 +43,22 @@ on:
         required: true
         default: false
         type: boolean
-      preview_foundation:
-        description: Preview the registry and vault foundation without deploying it
+      foundation_action:
+        description: Preview or apply only the approved registry and vault foundation
         required: true
-        default: false
-        type: boolean
+        default: none
+        type: choice
+        options:
+          - none
+          - preview
+          - apply
 
 permissions:
   contents: read
 
 jobs:
   preview-foundation:
-    if: ${{ inputs.preview_foundation }}
+    if: ${{ inputs.foundation_action == 'preview' || inputs.foundation_action == 'apply' }}
     runs-on: ubuntu-latest
     environment: dev
     timeout-minutes: 10
@@ -72,12 +76,14 @@ jobs:
       - name: Preview the resource-group foundation
         env:
           DEPLOYER_OBJECT_ID: ${{ vars.AZURE_DEPLOYER_OBJECT_ID }}
+          TARGET_CLIENT: ${{ vars.AZURE_CLIENT_ID }}
           TARGET_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
           TARGET_TENANT: ${{ vars.AZURE_TENANT_ID }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ "$DEPLOYER_OBJECT_ID" != "b6a3c39d-0263-4f01-b975-654cdea443a0" ||
+                "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
                 "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
                 "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
             echo "::error::The identity, tenant, or subscription does not match the approved target."
@@ -189,11 +195,17 @@ jobs:
       ORDERS_REF: ${{ inputs.orders_ref }}
       INVENTORY_REF: ${{ inputs.inventory_ref }}
       NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+      FOUNDATION_ACTION: ${{ inputs.foundation_action }}
+      BOOTSTRAP_RG: ${{ inputs.bootstrap_rg }}
     steps:
       - name: Require immutable application revisions
         shell: bash
         run: |
           set -euo pipefail
+          if [[ "$FOUNDATION_ACTION" == "apply" && "$BOOTSTRAP_RG" == "true" ]]; then
+            echo "::error::Foundation apply and resource-group bootstrap cannot run together."
+            exit 1
+          fi
           for ref in "$PORTAL_REF" "$GATEWAY_REF" "$ORDERS_REF" "$INVENTORY_REF" "$NOTIFICATIONS_REF"; do
             if [[ ! "$ref" =~ ^[0-9a-f]{40}$ ]]; then
               echo "::error::Each application revision must be a full lowercase Git commit SHA."
@@ -219,6 +231,85 @@ jobs:
       inventory_ref: ${{ inputs.inventory_ref }}
       notifications_ref: ${{ inputs.notifications_ref }}
       preserve_images: ${{ inputs.preserve_images }}
+  apply-foundation:
+    if: ${{ inputs.foundation_action == 'apply' && !inputs.bootstrap_rg }}
+    needs: [preview-foundation, validate-bicep, quality]
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: foundation-preview-${{ github.run_id }}
+          path: approved-foundation
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Recheck and apply the foundation only
+        env:
+          DEPLOYER_OBJECT_ID: ${{ vars.AZURE_DEPLOYER_OBJECT_ID }}
+          TARGET_CLIENT: ${{ vars.AZURE_CLIENT_ID }}
+          TARGET_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TARGET_TENANT: ${{ vars.AZURE_TENANT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$DEPLOYER_OBJECT_ID" != "b6a3c39d-0263-4f01-b975-654cdea443a0" ||
+                "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
+                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
+                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+            echo "::error::The identity, tenant, or subscription does not match the approved target."
+            exit 1
+          fi
+          echo "started foundation recheck run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee foundation-apply-audit.log
+          if az deployment group what-if \
+            --name "foundation-recheck-$GITHUB_RUN_ID" \
+            --resource-group agtsdlc-dev-rg \
+            --template-file infra/foundation.bicep \
+            --parameters infra/foundation.parameters.json deployerObjectId="$DEPLOYER_OBJECT_ID" \
+            --no-pretty-print --no-prompt --output json > foundation-recheck.json; then
+            echo "succeeded foundation recheck" | tee -a foundation-apply-audit.log
+          else
+            code=$?
+            echo "failed foundation recheck exit=$code" | tee -a foundation-apply-audit.log
+            exit "$code"
+          fi
+          if node scripts/validate-foundation-preview.js foundation-recheck.json approved-foundation/foundation-what-if.json; then
+            echo "succeeded foundation recheck comparison" | tee -a foundation-apply-audit.log
+          else
+            echo "failed foundation recheck comparison" | tee -a foundation-apply-audit.log
+            exit 1
+          fi
+          echo "started foundation apply run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee -a foundation-apply-audit.log
+          if az deployment group create \
+            --name "foundation-$GITHUB_RUN_ID" \
+            --resource-group agtsdlc-dev-rg \
+            --template-file infra/foundation.bicep \
+            --parameters infra/foundation.parameters.json deployerObjectId="$DEPLOYER_OBJECT_ID" \
+            --no-prompt --output json > foundation-result.json; then
+            echo "succeeded foundation apply" | tee -a foundation-apply-audit.log
+          else
+            code=$?
+            echo "failed foundation apply exit=$code" | tee -a foundation-apply-audit.log
+            exit "$code"
+          fi
+      - name: Preserve foundation apply evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundation-apply-${{ github.run_id }}
+          path: |
+            foundation-apply-audit.log
+            foundation-recheck.json
+            foundation-result.json
+          if-no-files-found: warn
   bootstrap-rg:
     if: ${{ inputs.bootstrap_rg }}
     needs: [preview-bootstrap, validate-bicep, quality]
