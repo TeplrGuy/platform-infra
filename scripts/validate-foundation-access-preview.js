@@ -2,7 +2,7 @@ const { readFileSync } = require('node:fs');
 const { isDeepStrictEqual } = require('node:util');
 const { createParameters } = require('./foundation-access-parameters');
 
-const subscription = '8fcc5e8e-6540-4288-89e7-849e94290205';
+const subscription = 'b6f10878-9f8a-4b3f-8bc5-3464cdd79c77';
 const root = `/subscriptions/${subscription}/resourceGroups/agtsdlc-dev-rg/providers`;
 const registry = `${root}/Microsoft.ContainerRegistry/registries/cragentsdlcdev55eb`;
 const vault = `${root}/Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb`;

@@ -6,10 +6,10 @@ const release = require('../infra/private-release.json');
 const foundation = require('../infra/foundation.parameters.json').parameters;
 
 const refs = Object.fromEntries(release.services.map(service => [service.refEnv, service.revision]));
-const root = '/subscriptions/8fcc5e8e-6540-4288-89e7-849e94290205/resourceGroups/agtsdlc-dev-rg/providers/';
+const root = '/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/';
 const domain = 'example-1234.northeurope.azurecontainerapps.io';
 const clientId = 'c0ffee00-1234-4567-89ab-0123456789ab';
-const tenantId = 'd11cdc76-c6f2-4368-a98f-498e78a7e011';
+const tenantId = '16b3c013-d300-468d-ac64-7eda0820b6d3';
 const names = foundation.appNames.value;
 const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb`;
 const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-55eb`;

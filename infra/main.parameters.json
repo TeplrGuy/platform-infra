@@ -9,7 +9,7 @@
     "createdAt": { "value": "2026-11-11T15:43:42.2240991-05:00" },
     "deployerObjectId": { "value": "__SET_BY_GITHUB_ACTIONS__" },
     "entraClientId": { "value": "__SET_BEFORE_DEPLOY__" },
-    "entraTenantId": { "value": "d11cdc76-c6f2-4368-a98f-498e78a7e011" },
+    "entraTenantId": { "value": "16b3c013-d300-468d-ac64-7eda0820b6d3" },
     "isPlaceholder": { "value": true },
     "containerImage": { "value": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" },
     "containerImages": {

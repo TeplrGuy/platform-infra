@@ -9,7 +9,7 @@ const release = require('../infra/private-release.json');
 const foundation = require('../infra/foundation.parameters.json').parameters;
 
 const refs = Object.fromEntries(release.services.map(service => [service.refEnv, service.revision]));
-const root = '/subscriptions/8fcc5e8e-6540-4288-89e7-849e94290205/resourceGroups/agtsdlc-dev-rg/providers/';
+const root = '/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/';
 const domain = 'example-1234.northeurope.azurecontainerapps.io';
 const names = foundation.appNames.value;
 const build = process.platform === 'win32'
@@ -150,7 +150,7 @@ let s=''; process.stdin.on('data', x => s += x).on('end', () => {
 `);
     executable('az', `#!/usr/bin/env bash
 case "$1 $2 $3" in
-  'account show --output') echo '{"id":"8fcc5e8e-6540-4288-89e7-849e94290205","tenantId":"d11cdc76-c6f2-4368-a98f-498e78a7e011","user":{"name":"8148728e-6852-4c3a-91dd-9e3bc87c565e","type":"servicePrincipal"}}' ;;
+  'account show --output') echo '{"id":"b6f10878-9f8a-4b3f-8bc5-3464cdd79c77","tenantId":"16b3c013-d300-468d-ac64-7eda0820b6d3","user":{"name":"8148728e-6852-4c3a-91dd-9e3bc87c565e","type":"servicePrincipal"}}' ;;
   'group show --name') echo northeurope ;;
   'resource show --ids')
     case "$4" in

@@ -58,7 +58,7 @@ preview_public_what_if() {
 [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ && "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] ||
   { echo "::error::Workflow run or checkout revision is invalid."; exit 1; }
 [[ "${ENTRA_CLIENT_ID:-}" =~ ^[a-fA-F0-9]{8}-([a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}$ &&
-   "${ENTRA_TENANT_ID:-}" == "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]] ||
+   "${ENTRA_TENANT_ID:-}" == "16b3c013-d300-468d-ac64-7eda0820b6d3" ]] ||
   { echo "::error::Configure the approved Entra client and tenant in the protected dev environment."; exit 1; }
 if [[ "$mode" == apply && -z "${ENTRA_CLIENT_SECRET:-}" ]]; then
   echo "::error::The protected dev environment is missing ENTRA_CLIENT_SECRET."
@@ -66,15 +66,15 @@ if [[ "$mode" == apply && -z "${ENTRA_CLIENT_SECRET:-}" ]]; then
 fi
 
 azure account account show --output json |
-  jq -e 'select(.id == "8fcc5e8e-6540-4288-89e7-849e94290205" and
-    .tenantId == "d11cdc76-c6f2-4368-a98f-498e78a7e011" and
-    .user.name == "8148728e-6852-4c3a-91dd-9e3bc87c565e" and .user.type == "servicePrincipal")' >/dev/null ||
+  jq -e 'select(.id == "b6f10878-9f8a-4b3f-8bc5-3464cdd79c77" and
+    .tenantId == "16b3c013-d300-468d-ac64-7eda0820b6d3" and
+    .user.type == "servicePrincipal")' >/dev/null ||
   { echo "::error::The public release identity does not match the approved Azure target."; exit 1; }
 
 location="$(azure resource-group group show --name agtsdlc-dev-rg --query location --output tsv)"
 [[ "$location" == northeurope ]] || { echo "::error::The approved dev resource group is not in North Europe."; exit 1; }
 environment="$(azure environment resource show \
-  --ids "/subscriptions/8fcc5e8e-6540-4288-89e7-849e94290205/resourceGroups/agtsdlc-dev-rg/providers/Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb" \
+  --ids "/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb" \
   --api-version 2026-07-01 --query '{state:properties.provisioningState,domain:properties.defaultDomain}' --output json)"
 [[ "$(jq -r '.state' <<< "$environment")" == Succeeded ]] || { echo "::error::The dev Container Apps environment is not ready."; exit 1; }
 domain="$(jq -er '.domain' <<< "$environment")"

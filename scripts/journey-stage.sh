@@ -6,7 +6,7 @@ set -euo pipefail
 bash scripts/health-stage.sh verify
 domain="$(cat health-domain.txt)"
 order="demo-$GITHUB_RUN_ID"
-scope="/subscriptions/8fcc5e8e-6540-4288-89e7-849e94290205/resourceGroups/agtsdlc-dev-rg/providers"
+scope="/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers"
 job="$scope/Microsoft.App/jobs/job-agentsdlc-dev-55eb-health"
 audit() { printf '%s run=%s commit=%s\n' "$*" "$GITHUB_RUN_ID" "$GITHUB_SHA" | tee -a journey-audit.log >&2; }
 azure() {

@@ -4,7 +4,7 @@ const { isDeepStrictEqual } = require('node:util');
 const release = require('../infra/private-release.json');
 const foundation = require('../infra/foundation.parameters.json').parameters;
 
-const root = '/subscriptions/8fcc5e8e-6540-4288-89e7-849e94290205/resourceGroups/agtsdlc-dev-rg/providers/';
+const root = '/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/';
 const registry = 'cragentsdlcdev55eb.azurecr.io';
 const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-55eb`;
 const vaultSecret = 'https://kv-agentsdlc-dev-55eb.vault.azure.net/secrets/postgres-database-url';

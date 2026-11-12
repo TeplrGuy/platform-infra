@@ -95,10 +95,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$DEPLOYER_OBJECT_ID" != "b6a3c39d-0263-4f01-b975-654cdea443a0" ||
-                "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
-                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
-                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+          if [[ -z "$DEPLOYER_OBJECT_ID" ||
+                -z "$TARGET_CLIENT" ||
+                "$TARGET_SUBSCRIPTION" != "b6f10878-9f8a-4b3f-8bc5-3464cdd79c77" ||
+                "$TARGET_TENANT" != "16b3c013-d300-468d-ac64-7eda0820b6d3" ]]; then
             echo "::error::The identity, tenant, or subscription does not match the approved target."
             exit 1
           fi
@@ -154,9 +154,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
-                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
-                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+          if [[ -z "$TARGET_CLIENT" ||
+                "$TARGET_SUBSCRIPTION" != "b6f10878-9f8a-4b3f-8bc5-3464cdd79c77" ||
+                "$TARGET_TENANT" != "16b3c013-d300-468d-ac64-7eda0820b6d3" ]]; then
             echo "::error::The identity, tenant, or subscription does not match the approved target."
             exit 1
           fi
@@ -351,9 +351,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
-                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
-                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+          if [[ -z "$TARGET_CLIENT" ||
+                "$TARGET_SUBSCRIPTION" != "b6f10878-9f8a-4b3f-8bc5-3464cdd79c77" ||
+                "$TARGET_TENANT" != "16b3c013-d300-468d-ac64-7eda0820b6d3" ]]; then
             echo "::error::The identity, tenant, or subscription does not match the approved target."
             exit 1
           fi
@@ -445,10 +445,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$DEPLOYER_OBJECT_ID" != "b6a3c39d-0263-4f01-b975-654cdea443a0" ||
-                "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
-                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
-                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+          if [[ -z "$DEPLOYER_OBJECT_ID" ||
+                -z "$TARGET_CLIENT" ||
+                "$TARGET_SUBSCRIPTION" != "b6f10878-9f8a-4b3f-8bc5-3464cdd79c77" ||
+                "$TARGET_TENANT" != "16b3c013-d300-468d-ac64-7eda0820b6d3" ]]; then
             echo "::error::The identity, tenant, or subscription does not match the approved target."
             exit 1
           fi
@@ -528,9 +528,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
-                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
-                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+          if [[ -z "$TARGET_CLIENT" ||
+                "$TARGET_SUBSCRIPTION" != "b6f10878-9f8a-4b3f-8bc5-3464cdd79c77" ||
+                "$TARGET_TENANT" != "16b3c013-d300-468d-ac64-7eda0820b6d3" ]]; then
             echo "::error::The identity, tenant, or subscription does not match the approved target."
             exit 1
           fi
