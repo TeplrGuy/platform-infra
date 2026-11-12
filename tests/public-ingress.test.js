@@ -86,6 +86,27 @@ test('foundation contains no workload or secrets and scopes publisher access to 
   assert.match(roleModule.properties.template.variables.acrPushRole, /8311e382-0749-4cb8-b61a-304f252e45ec/);
 });
 
+test('runtime prerequisites contain no workloads or role grants and never expose a credential output', () => {
+  const template = getTemplate('infra/runtime-foundation.bicep');
+  assert.equal(template.parameters.postgresAdminPassword.type.toLowerCase(), 'securestring');
+  const resources = Object.values(template.resources).flatMap(module => Object.values(module.properties.template.resources));
+  assert.equal(resources.filter(resource => !resource.condition).length, 8);
+  assert.equal(template.resources.secrets.properties.parameters.enableEntraAuth.value, false);
+  assert.ok(resources.every(resource =>
+    resource.type !== 'Microsoft.App/containerApps' &&
+    resource.type !== 'Microsoft.Authorization/roleAssignments'
+  ));
+  assert.deepEqual(Object.keys(template.outputs).sort(),
+    ['appInsightsId', 'environmentDefaultDomain', 'environmentId', 'postgresFqdn']);
+  const seed = getTemplate('infra/runtime-secrets.bicep');
+  assert.equal(seed.parameters.postgresAdminPassword.type.toLowerCase(), 'securestring');
+  const secrets = Object.values(seed.resources);
+  assert.equal(secrets.length, 1);
+  assert.equal(secrets[0].type, 'Microsoft.KeyVault/vaults/secrets');
+  assert.equal(secrets[0].properties.value, "[parameters('postgresAdminPassword')]");
+  assert.equal(Object.keys(seed.outputs || {}).length, 0);
+});
+
 test('application identities and access exist before the apps that use them', () => {
   const template = getTemplate();
   const identities = template.resources.identities;

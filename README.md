@@ -111,6 +111,16 @@ before applying only the foundation. The preview validator accepts only the nine
 creations and can compare a post-approval recheck against the reviewed preview.
 It intentionally rejects retries against an already-created foundation; a safe
 reconciliation path is still required.
+`foundation_action: runtime-apply` is a separate staged prerequisite rollout:
+preview a missing database credential, require a protected approval and matching
+recheck, then generate it once into Key Vault through Bicep. An existing
+credential is reused; a database without its recorded credential blocks the
+seed rather than resetting its password. Secure values enter Bicep through
+environment-backed `.bicepparam` files and are excluded from stored previews.
+After quality gates, a second preview/approval/recheck deploys only the planned
+North Europe PostgreSQL, telemetry and Container Apps environment. It creates
+no application workloads, role grants or Entra registration. New runtime apply
+jobs use a non-canceling FIFO queue. The final application-release block remains.
 The test, production, and rollback workflows remain blocked and must be
 adapted to resource-group-scope deployment and verified before enabling them.
 `infra/rg-rbac-condition.txt` is a proposed Azure RBAC condition for scoped
