@@ -760,7 +760,7 @@ jobs:
             runtime-credential-id.txt
           if-no-files-found: warn
   apply-runtime:
-    if: ${{ inputs.foundation_action == 'runtime-apply' }}
+    if: ${{ always() && !cancelled() && inputs.foundation_action == 'runtime-apply' && needs.preview-runtime.result == 'success' }}
     needs: [preview-runtime]
     runs-on: ubuntu-24.04
     environment: dev
