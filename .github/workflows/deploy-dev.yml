@@ -53,6 +53,7 @@ on:
           - preview
           - apply
           - access-preview
+          - publish-images
 
 permissions:
   contents: read
@@ -265,13 +266,18 @@ jobs:
       NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
       FOUNDATION_ACTION: ${{ inputs.foundation_action }}
       BOOTSTRAP_RG: ${{ inputs.bootstrap_rg }}
+      PRESERVE_IMAGES: ${{ inputs.preserve_images }}
     steps:
       - name: Require immutable application revisions
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$FOUNDATION_ACTION" == "apply" && "$BOOTSTRAP_RG" == "true" ]]; then
-            echo "::error::Foundation apply and resource-group bootstrap cannot run together."
+          if [[ "$FOUNDATION_ACTION" != "none" && "$BOOTSTRAP_RG" == "true" ]]; then
+            echo "::error::Foundation work and resource-group bootstrap cannot run together."
+            exit 1
+          fi
+          if [[ "$FOUNDATION_ACTION" == "publish-images" && "$PRESERVE_IMAGES" != "true" ]]; then
+            echo "::error::Image publication requires preserving the quality-gated images."
             exit 1
           fi
           for ref in "$PORTAL_REF" "$GATEWAY_REF" "$ORDERS_REF" "$INVENTORY_REF" "$NOTIFICATIONS_REF"; do
@@ -377,6 +383,116 @@ jobs:
             foundation-apply-audit.log
             foundation-recheck.json
             foundation-result.json
+          if-no-files-found: warn
+  publish-images:
+    if: ${{ inputs.foundation_action == 'publish-images' && inputs.preserve_images && !inputs.bootstrap_rg }}
+    needs: [validate-bicep, quality]
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-images-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-images
+      - name: Sign in with the protected environment identity
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Verify and publish the exact quality-gated images
+        env:
+          TARGET_CLIENT: ${{ vars.AZURE_CLIENT_ID }}
+          TARGET_SUBSCRIPTION: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TARGET_TENANT: ${{ vars.AZURE_TENANT_ID }}
+          PORTAL_REF: ${{ inputs.portal_ref }}
+          GATEWAY_REF: ${{ inputs.gateway_ref }}
+          ORDERS_REF: ${{ inputs.orders_ref }}
+          INVENTORY_REF: ${{ inputs.inventory_ref }}
+          NOTIFICATIONS_REF: ${{ inputs.notifications_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET_CLIENT" != "8148728e-6852-4c3a-91dd-9e3bc87c565e" ||
+                "$TARGET_SUBSCRIPTION" != "8fcc5e8e-6540-4288-89e7-849e94290205" ||
+                "$TARGET_TENANT" != "d11cdc76-c6f2-4368-a98f-498e78a7e011" ]]; then
+            echo "::error::The identity, tenant, or subscription does not match the approved target."
+            exit 1
+          fi
+          node scripts/verify-image-artifact.js archive release-images "$GITHUB_RUN_ID"
+          docker image load --input release-images/images.tar.gz
+          node scripts/verify-image-artifact.js loaded release-images "$GITHUB_RUN_ID"
+          echo "started registry login run=$GITHUB_RUN_ID commit=$GITHUB_SHA" | tee image-publish-audit.log
+          logged_in=false
+          for attempt in 1 2 3 4 5 6; do
+            if az acr login --name cragentsdlcdev55eb --subscription "$TARGET_SUBSCRIPTION"; then
+              logged_in=true
+              break
+            fi
+            echo "registry login attempt $attempt failed" | tee -a image-publish-audit.log
+            if [[ "$attempt" -lt 6 ]]; then sleep 20; fi
+          done
+          if [[ "$logged_in" != "true" ]]; then
+            echo "failed registry login" | tee -a image-publish-audit.log
+            exit 1
+          fi
+          echo "succeeded registry login" | tee -a image-publish-audit.log
+          for repo in portal-web api-gateway orders-service inventory-service notifications-service; do
+            source="local-gate/$repo:$GITHUB_RUN_ID"
+            target="cragentsdlcdev55eb.azurecr.io/$repo:$GITHUB_RUN_ID"
+            docker image tag "$source" "$target"
+            echo "started push image=$repo run=$GITHUB_RUN_ID" | tee -a image-publish-audit.log
+            pushed=false
+            for attempt in 1 2 3 4 5 6; do
+              if docker image push "$target" > "push-$repo.log" 2>&1; then
+                pushed=true
+                break
+              fi
+              cat "push-$repo.log"
+              echo "push attempt $attempt failed for $repo" | tee -a image-publish-audit.log
+              if [[ "$attempt" -lt 6 ]]; then sleep 20; fi
+            done
+            if [[ "$pushed" != "true" ]]; then
+              echo "failed push image=$repo" | tee -a image-publish-audit.log
+              exit 1
+            fi
+            digest="$(sed -nE 's/^.*digest: (sha256:[0-9a-f]{64}).*$/\1/p' "push-$repo.log" | tail -n 1)"
+            if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error::Registry manifest digest missing for $repo."
+              exit 1
+            fi
+            echo "started registry digest check image=$repo" | tee -a image-publish-audit.log
+            if registry_digest="$(az acr repository show --name cragentsdlcdev55eb \
+              --subscription "$TARGET_SUBSCRIPTION" --image "$repo:$GITHUB_RUN_ID" \
+              --query digest --output tsv)"; then
+              echo "succeeded registry digest check image=$repo" | tee -a image-publish-audit.log
+            else
+              echo "failed registry digest check image=$repo" | tee -a image-publish-audit.log
+              exit 1
+            fi
+            if [[ "$registry_digest" != "$digest" ]]; then
+              echo "::error::Registry digest differs from the pushed digest for $repo."
+              exit 1
+            fi
+            jq -cn --arg repo "$repo" --arg digest "$digest" \
+              --arg image "cragentsdlcdev55eb.azurecr.io/$repo@$digest" \
+              '{repository:$repo,digest:$digest,image:$image}' >> published-image-lines.json
+            echo "succeeded push image=$repo digest=$digest" | tee -a image-publish-audit.log
+          done
+          jq -s . published-image-lines.json > published-images.json
+      - name: Preserve image digest evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: published-images-${{ github.run_id }}
+          path: |
+            image-publish-audit.log
+            published-images.json
           if-no-files-found: warn
   bootstrap-rg:
     if: ${{ inputs.bootstrap_rg }}

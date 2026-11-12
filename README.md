@@ -69,6 +69,10 @@ does not authenticate an artifact's source; the release must also obtain it
 from the expected successful quality job and workflow run.
 When preserving images, supply full commit SHAs for all five inputs; branch
 names are not accepted as image provenance.
+`foundation_action: publish-images` publishes only the current run's
+quality-gated image artifact after protected environment approval. It records
+registry manifest digests, independently checked against the pushed digests;
+it does not deploy the application.
 GitHub requires the workflow to exist on the default branch before it can be
 dispatched. It is not currently a required PR check or a deployment approval.
 
