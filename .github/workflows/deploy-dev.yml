@@ -1004,6 +1004,8 @@ jobs:
           name: public-preview-${{ github.run_id }}
           path: |
             public-release-audit.log
+            public-what-if.stderr.log
+            public-what-if.raw.json
             public-what-if.json
             public-domain.txt
             public-callback-uri.txt
@@ -1056,6 +1058,8 @@ jobs:
           name: public-apply-${{ github.run_id }}
           path: |
             public-release-audit.log
+            public-what-if.stderr.log
+            public-what-if.raw.json
             public-what-if.json
             public-domain.txt
             public-callback-uri.txt
