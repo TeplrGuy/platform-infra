@@ -48,6 +48,9 @@ preview_public_what_if() {
       delay_seconds=$((delay_seconds * 2))
     fi
   done
+  if grep -q 'ReadOnlyDisabledSubscription' "$stderr_log"; then
+    echo "::error::Azure reports the target subscription is read-only/disabled. Re-enable or upgrade the subscription offer, then rerun public-preview."
+  fi
   echo "::error::Public what-if failed after retrying. See public-what-if.stderr.log for diagnostics."
   return 1
 }
