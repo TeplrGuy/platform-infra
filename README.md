@@ -135,8 +135,14 @@ references and mask secret names: the validator accepts only the exact scoped
 references and checks the compiled secret and environment expressions against
 reviewed hashes. Intentional changes to those expressions require reviewing and
 updating the hashes. The workflow checks the live registry and vault endpoints
-and uses the same compiled template for its what-if. It does not deploy workloads;
-protected promotion and in-environment health gates are still required.
+and uses the same compiled template for its what-if. It does not deploy workloads.
+`foundation_action: private-apply` runs that preview followed by a separate
+protected `dev` approval, then checks the template, parameters and a fresh what-if
+against the approved preview before applying only the five private workloads.
+This initial create-only path fails closed if applications already exist; recovery
+requires a separate reviewed path. It does not establish application health or
+enable public access. In-environment functional and durability checks, Entra sign-in,
+and protected public promotion remain required.
 The test, production, and rollback workflows remain blocked and must be
 adapted to resource-group-scope deployment and verified before enabling them.
 `infra/rg-rbac-condition.txt` is a proposed Azure RBAC condition for scoped

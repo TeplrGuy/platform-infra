@@ -135,19 +135,31 @@ function validate(preview, domain, refs, template) {
     active.set(id, app);
   }
   if (active.size !== 5) throw Error('Preview does not include all five applications.');
+  return active;
+}
+
+function validateAgainst(preview, approved, domain, refs, template) {
+  const current = validate(preview, domain, refs, template);
+  const baseline = validate(approved, domain, refs, template);
+  for (const [id, after] of current) {
+    if (!isDeepStrictEqual(after, baseline.get(id))) throw Error('Private workload preview changed after approval.');
+  }
 }
 
 if (require.main === module) {
   try {
-    const [mode, file, domain, templateFile] = process.argv.slice(2);
+    const [mode, file, domain, templateFile, approvedFile] = process.argv.slice(2);
     if (mode === 'parameters') {
       console.log(JSON.stringify({ $schema: 'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#',
         contentVersion: '1.0.0.0', parameters: { containerImages: { value: images(process.env) } } }, null, 2));
     } else if (mode === 'validate' && file && domain && templateFile) {
-      validate(JSON.parse(readFileSync(file, 'utf8')), domain, process.env, JSON.parse(readFileSync(templateFile, 'utf8')));
+      const current = JSON.parse(readFileSync(file, 'utf8'));
+      const template = JSON.parse(readFileSync(templateFile, 'utf8'));
+      if (approvedFile) validateAgainst(current, JSON.parse(readFileSync(approvedFile, 'utf8')), domain, process.env, template);
+      else validate(current, domain, process.env, template);
       console.log('Private workload preview matches the pinned images and approved scope.');
     } else {
-      throw Error('Usage: private-preview.js parameters | validate <file> <domain> <compiled-template>');
+      throw Error('Usage: private-preview.js parameters | validate <file> <domain> <compiled-template> [approved-preview]');
     }
   } catch (error) {
     console.error(`::error::${error.message}`);
@@ -155,4 +167,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { images, validate, validateTemplate };
+module.exports = { images, validate, validateAgainst, validateTemplate };

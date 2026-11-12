@@ -1,7 +1,10 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { spawnSync } = require('node:child_process');
-const { images, validate } = require('../scripts/private-preview');
+const { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { images, validate, validateAgainst } = require('../scripts/private-preview');
 const release = require('../infra/private-release.json');
 const foundation = require('../infra/foundation.parameters.json').parameters;
 
@@ -108,4 +111,121 @@ test('Azure unresolved references are accepted only for the approved resources',
   p.changes[2].after.properties.configuration.secrets[0].keyVaultUrl =
     `[concat(reference('${vaultId}-other', '2026-05-15').vaultUri, 'secrets/', 'postgres-database-url')]`;
   assert.throws(() => check(p), /secret reference/i);
+});
+
+test('promotion recheck rejects drift even in otherwise valid properties', () => {
+  const approved = preview();
+  const current = structuredClone(approved);
+  current.changes.reverse();
+  assert.doesNotThrow(() => validateAgainst(current, approved, domain, refs, template));
+  current.changes[0].after.properties.template.containers[0].probes[0].initialDelaySeconds = 99;
+  assert.doesNotThrow(() => check(current));
+  assert.throws(() => validateAgainst(current, approved, domain, refs, template), /changed after approval/i);
+});
+
+test('protected apply rechecks the approved preview before any Azure write', () => {
+  const tmp = mkdtempSync(path.join(os.tmpdir(), 'private-apply-test-'));
+  try {
+    const rootDir = path.resolve(__dirname, '..');
+    cpSync(path.join(rootDir, 'infra'), path.join(tmp, 'infra'), { recursive: true });
+    cpSync(path.join(rootDir, 'scripts'), path.join(tmp, 'scripts'), { recursive: true });
+    const bin = path.join(tmp, 'bin');
+    mkdirSync(bin);
+    const executable = (name, content) => {
+      const file = path.join(bin, name);
+      writeFileSync(file, content);
+      chmodSync(file, 0o755);
+    };
+    executable('git', `#!/usr/bin/env bash
+if [[ "$1" == rev-parse ]]; then echo "$GITHUB_SHA"; else
+  find infra -type f -print0
+  printf '%s\\0' scripts/private-preview.sh scripts/private-preview.js scripts/runtime-preview.js
+fi
+`);
+    executable('jq', `#!/usr/bin/env node
+let s=''; process.stdin.on('data', x => s += x).on('end', () => {
+  const p = JSON.parse(s);
+  console.log(process.argv.at(-1) === '.state' ? p.state : p.domain);
+});
+`);
+    executable('az', `#!/usr/bin/env bash
+case "$1 $2 $3" in
+  'account show --output') echo '{"id":"8fcc5e8e-6540-4288-89e7-849e94290205","tenantId":"d11cdc76-c6f2-4368-a98f-498e78a7e011","user":{"name":"8148728e-6852-4c3a-91dd-9e3bc87c565e","type":"servicePrincipal"}}' ;;
+  'group show --name') echo northeurope ;;
+  'resource show --ids')
+    case "$4" in
+      */managedEnvironments/*) printf '{"state":"Succeeded","domain":"%s"}\\n' "$TEST_DOMAIN" ;;
+      */registries/*) echo cragentsdlcdev55eb.azurecr.io ;;
+      */vaults/*) echo https://kv-agentsdlc-dev-55eb.vault.azure.net/ ;;
+      */containerApps/*) cat "$TEST_LIVE_DIR/\${4##*/}.json" ;;
+      *) exit 1 ;;
+    esac ;;
+  'bicep build --file') cat "$TEST_TEMPLATE" ;;
+  'deployment group what-if') cat "$TEST_PREVIEW" ;;
+  'deployment group create') touch "$TEST_WRITTEN"; echo Succeeded ;;
+  *) echo "Unexpected Azure command" >&2; exit 1 ;;
+esac
+`);
+    const unix = p => {
+      if (process.platform !== 'win32') return p;
+      const result = spawnSync('bash', ['-c', 'cygpath -u "$1"', '_', p], { encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+      return result.stdout.trim();
+    };
+    const templateFile = path.join(tmp, 'compiled-fixture.json');
+    const previewFile = path.join(tmp, 'what-if-fixture.json');
+    const written = path.join(tmp, 'azure-write');
+    const liveDir = path.join(tmp, 'live');
+    mkdirSync(liveDir);
+    writeFileSync(templateFile, JSON.stringify(template));
+    const baseline = preview();
+    writeFileSync(previewFile, JSON.stringify(baseline));
+    for (const change of baseline.changes) {
+      const name = change.resourceId.split('/').at(-1);
+      writeFileSync(path.join(liveDir, `${name}.json`), JSON.stringify({ state: 'Succeeded', external: false,
+        image: change.after.properties.template.containers[0].image }));
+    }
+    const env = { ...process.env, ...refs, GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'TeplrGuy/platform-infra',
+      GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_RUN_ID: '123', GITHUB_SHA: 'a'.repeat(40),
+      TEST_DOMAIN: domain, TEST_TEMPLATE: unix(templateFile), TEST_PREVIEW: unix(previewFile),
+      TEST_WRITTEN: unix(written), TEST_BIN: unix(bin), TEST_ROOT: unix(tmp), TEST_LIVE_DIR: unix(liveDir) };
+    const run = mode => spawnSync('bash', ['-c',
+      'export PATH="$TEST_BIN:$PATH"; cd "$TEST_ROOT"; bash scripts/private-preview.sh "$1"', '_', mode],
+    { env, encoding: 'utf8' });
+    const first = run('preview');
+    assert.equal(first.status, 0, first.stderr);
+    const approved = path.join(tmp, 'approved-private');
+    mkdirSync(approved);
+    for (const file of ['private-domain.txt', 'private-parameters.json', 'private-template.sha256', 'private-what-if.json']) {
+      cpSync(path.join(tmp, file), path.join(approved, file));
+    }
+    const drift = structuredClone(baseline);
+    drift.changes[0].after.properties.template.containers[0].probes[0].initialDelaySeconds = 99;
+    writeFileSync(previewFile, JSON.stringify(drift));
+    const rejected = run('apply');
+    assert.notEqual(rejected.status, 0);
+    assert.match(rejected.stderr, /changed after approval/i);
+    assert.equal(existsSync(written), false);
+    writeFileSync(previewFile, JSON.stringify(baseline));
+    const approvedParameters = path.join(approved, 'private-parameters.json');
+    const savedParameters = readFileSync(approvedParameters);
+    writeFileSync(approvedParameters, '{}');
+    const changedParameters = run('apply');
+    assert.notEqual(changedParameters.status, 0);
+    assert.match(changedParameters.stdout + changedParameters.stderr, /parameters changed/i);
+    assert.equal(existsSync(written), false);
+    writeFileSync(approvedParameters, savedParameters);
+    const accepted = run('apply');
+    assert.equal(accepted.status, 0, accepted.stderr);
+    assert.equal(existsSync(written), true);
+    const appFile = path.join(liveDir, `${names[0]}.json`);
+    const liveApp = JSON.parse(readFileSync(appFile, 'utf8'));
+    liveApp.external = true;
+    writeFileSync(appFile, JSON.stringify(liveApp));
+    const unsafeRuntime = run('apply');
+    assert.notEqual(unsafeRuntime.status, 0);
+    assert.match(unsafeRuntime.stderr, /ingress, or image differs/i);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 });
