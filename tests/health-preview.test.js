@@ -36,8 +36,11 @@ function preview() {
 
 test('health preview permits only the scoped, read-only health job', () => {
   assert.doesNotThrow(() => validate(preview(), domain, source));
+  const modified = preview();
+  modified.changes[0].changeType = 'Modify';
+  assert.doesNotThrow(() => validate(modified, domain, source));
   for (const mutate of [
-    p => { p.changes[0].changeType = 'Modify'; },
+    p => { p.changes[0].changeType = 'Delete'; },
     p => { p.changes[0].after.identity.type = 'SystemAssigned'; },
     p => { p.changes[0].after.properties.template.containers[0].command[2] += 'changed'; },
     p => { p.changes[0].after.properties.template.containers[0].env[1].value = 'attacker.example'; },

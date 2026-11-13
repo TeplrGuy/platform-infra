@@ -19,11 +19,14 @@ function validate(preview, domain, source) {
     if (!id || !id.startsWith(root.toLowerCase()) || seen.has(id)) throw Error('Duplicate or out-of-scope preview resource.');
     seen.add(id);
     if (change.changeType === 'Ignore') continue;
-    if (id !== jobId.toLowerCase() || change.changeType !== 'Create' ||
-        change.after?.id?.toLowerCase() !== id || change.after?.type?.toLowerCase() !== 'microsoft.app/jobs') {
-      throw Error('Only initial creation of the private health job is allowed.');
+    if (id !== jobId.toLowerCase() || !['Create', 'Modify', 'NoChange'].includes(change.changeType)) {
+      throw Error('Only the approved private health job may change.');
     }
-    job = change.after;
+    const after = change.after ?? change.before;
+    if (after?.id?.toLowerCase() !== id || after?.type?.toLowerCase() !== 'microsoft.app/jobs') {
+      throw Error('Private health job preview is missing current job details.');
+    }
+    job = after;
   }
   if (!job || job.location?.replace(/\s/g, '').toLowerCase() !== 'northeurope' || job.identity?.type !== 'UserAssigned' ||
       !isDeepStrictEqual(Object.keys(job.identity.userAssignedIdentities || {}).map(x => x.toLowerCase()), [identityId.toLowerCase()]) ||
