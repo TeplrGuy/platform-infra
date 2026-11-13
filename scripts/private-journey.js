@@ -37,15 +37,28 @@ async function journey(domain, orderId, mode, request = fetch, sleep = ms => new
     throw Error(`Unable to warm ${expected}.`);
   }));
   const orderUrl = `${url('apigw')}/api/orders/${orderId}`;
-  const assertOrder = (result, requireCreatedStatus = false) => {
+  const isOrderValid = (result, requireCreatedStatus = false) => {
     const order = result.body.order;
-    if (result.status !== 200 || order?.orderId !== orderId || order.customerId !== 'demo-customer' ||
-        order.sku !== 'SKU-100' || order.quantity !== 1 ||
-        (requireCreatedStatus && order.status !== 'created') ||
-        !order.timeline?.some(item => item.stage === 'inventory_reserved') ||
-        !order.timeline?.some(item => item.stage === 'notification_accepted')) {
-      throw Error('Order verification failed.');
+    return result.status === 200 &&
+      order?.orderId === orderId &&
+      order.customerId === 'demo-customer' &&
+      order.sku === 'SKU-100' &&
+      order.quantity === 1 &&
+      (!requireCreatedStatus || order.status === 'created') &&
+      order.timeline?.some(item => item.stage === 'inventory_reserved') &&
+      order.timeline?.some(item => item.stage === 'notification_accepted');
+  };
+  const assertOrder = (result, requireCreatedStatus = false) => {
+    if (!isOrderValid(result, requireCreatedStatus)) throw Error('Order verification failed.');
+  };
+  const waitFor = async (probe, attempts, errorMessage) => {
+    let last;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      last = await probe();
+      if (last.ok) return last.value;
+      if (attempt < attempts - 1) await sleep(10000);
     }
+    throw Error(errorMessage);
   };
   if (mode === 'create') {
     const existing = await get(orderUrl);
@@ -73,11 +86,26 @@ async function journey(domain, orderId, mode, request = fetch, sleep = ms => new
     }
     console.log(`JOURNEY INVENTORY PASS before=${before.body.available} after=${after.body.available}`);
   }
-  assertOrder(await get(orderUrl));
-  const notification = await get(`${url('notify')}/notifications/order/${orderId}`);
-  if (notification.status !== 200 || notification.body.orderId !== orderId ||
-      notification.body.count !== 1 || notification.body.items?.[0]?.orderId !== orderId) {
-    throw Error('Notification verification failed.');
+  if (mode === 'verify') {
+    await waitFor(async () => {
+      const result = await get(orderUrl);
+      return { ok: isOrderValid(result), value: result };
+    }, 6, 'Order verification failed.');
+    await waitFor(async () => {
+      const notification = await get(`${url('notify')}/notifications/order/${orderId}`);
+      const ok = notification.status === 200 &&
+        notification.body.orderId === orderId &&
+        notification.body.count === 1 &&
+        notification.body.items?.[0]?.orderId === orderId;
+      return { ok, value: notification };
+    }, 6, 'Notification verification failed.');
+  } else {
+    assertOrder(await get(orderUrl));
+    const notification = await get(`${url('notify')}/notifications/order/${orderId}`);
+    if (notification.status !== 200 || notification.body.orderId !== orderId ||
+        notification.body.count !== 1 || notification.body.items?.[0]?.orderId !== orderId) {
+      throw Error('Notification verification failed.');
+    }
   }
   console.log(`JOURNEY_SUMMARY PASS mode=${mode} order=${orderId}`);
 }
