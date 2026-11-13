@@ -149,7 +149,7 @@ function validate(preview, domain, refs, template, clientId, tenantId) {
         const secret = secrets[0];
         const unresolved = typeof secret === 'string' &&
           secret.includes("createObject('name', variables('databaseUrlSecret')") &&
-          secret.includes("'postgres-database-url'");
+          secret.includes("parameters('databaseUrl')");
         if (!unresolved && secret?.name !== 'postgres-database-url') {
           throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
         }
