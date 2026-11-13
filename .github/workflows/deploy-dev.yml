@@ -1054,7 +1054,23 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
-      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+      - id: azure-login-health-preview-attempt-0
+        continue-on-error: true
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - id: azure-login-health-preview-attempt-1
+        if: ${{ steps.azure-login-health-preview-attempt-0.outcome == 'failure' }}
+        continue-on-error: true
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - if: ${{ steps.azure-login-health-preview-attempt-0.outcome == 'failure' && steps.azure-login-health-preview-attempt-1.outcome == 'failure' }}
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -1107,7 +1123,23 @@ jobs:
         with:
           name: public-preview-${{ github.run_id }}
           path: approved-public
-      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+      - id: azure-login-health-apply-attempt-0
+        continue-on-error: true
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - id: azure-login-health-apply-attempt-1
+        if: ${{ steps.azure-login-health-apply-attempt-0.outcome == 'failure' }}
+        continue-on-error: true
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - if: ${{ steps.azure-login-health-apply-attempt-0.outcome == 'failure' && steps.azure-login-health-apply-attempt-1.outcome == 'failure' }}
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -1159,7 +1191,23 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
-      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+      - id: azure-login-health-run-attempt-0
+        continue-on-error: true
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - id: azure-login-health-run-attempt-1
+        if: ${{ steps.azure-login-health-run-attempt-0.outcome == 'failure' }}
+        continue-on-error: true
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - if: ${{ steps.azure-login-health-run-attempt-0.outcome == 'failure' && steps.azure-login-health-run-attempt-1.outcome == 'failure' }}
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -1199,7 +1247,23 @@ jobs:
         with:
           name: health-preview-${{ github.run_id }}
           path: approved-health
-      - uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+      - id: azure-login-journey-run-attempt-0
+        continue-on-error: true
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - id: azure-login-journey-run-attempt-1
+        if: ${{ steps.azure-login-journey-run-attempt-0.outcome == 'failure' }}
+        continue-on-error: true
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - if: ${{ steps.azure-login-journey-run-attempt-0.outcome == 'failure' && steps.azure-login-journey-run-attempt-1.outcome == 'failure' }}
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
