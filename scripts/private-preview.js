@@ -80,7 +80,8 @@ function validate(preview, domain, refs, template) {
       if (app.tags?.[key] !== value) throw Error('Application tags differ from the approved plan.');
     }
     const config = properties.configuration;
-    if (config?.ingress?.external !== false || config.ingress.targetPort !== 3000 || config.ingress.transport !== 'auto' ||
+    if (config?.ingress?.external !== false || config.ingress.targetPort !== 3000 ||
+        String(config.ingress.transport || '').toLowerCase() !== 'auto' ||
         config.activeRevisionsMode !== 'Single' || config.registries?.length !== 1 ||
         ![registry, `[reference('${registryId}', '2025-11-01').loginServer]`].includes(config.registries[0].server) ||
         config.registries[0].identity?.toLowerCase() !== identity.toLowerCase()) {
