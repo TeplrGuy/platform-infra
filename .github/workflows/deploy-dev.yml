@@ -939,8 +939,16 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Retry Azure login for private apply
+      - id: azure-login-private-apply-retry-1
+        name: Retry Azure login for private apply
         if: ${{ steps.azure-login-private-apply.outcome == 'failure' }}
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Retry Azure login for private apply (attempt 3)
+        if: ${{ steps.azure-login-private-apply-retry-1.outcome == 'failure' }}
         uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -995,8 +1003,16 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Retry Azure login for private apply
+      - id: azure-login-private-apply-retry-1
+        name: Retry Azure login for private apply
         if: ${{ steps.azure-login-private-apply.outcome == 'failure' }}
+        uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Retry Azure login for private apply (attempt 3)
+        if: ${{ steps.azure-login-private-apply-retry-1.outcome == 'failure' }}
         uses: azure/login@8216e11d8cd9b42fe925c852af8e76311ff067ac # v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
