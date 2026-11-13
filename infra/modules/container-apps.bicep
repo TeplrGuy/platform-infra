@@ -16,6 +16,8 @@ param entraClientId string
 param entraTenantId string
 @secure()
 param databaseUrl string = ''
+@secure()
+param entraClientSecret string = ''
 
 var services = [
   { name: 'portal-web', imageKey: 'portal', external: true, minReplicas: 0 }
@@ -72,7 +74,9 @@ resource apps 'Microsoft.App/containerApps@2026-07-01' = [
                 : [],
               service.name == 'portal-web' && enableEntraAuth
                 ? [
-                    { name: entraSecret, keyVaultUrl: concat(keyVaultUri, 'secrets/', entraSecret), identity: identityIds[i] }
+                    empty(entraClientSecret)
+                      ? { name: entraSecret, keyVaultUrl: concat(keyVaultUri, 'secrets/', entraSecret), identity: identityIds[i] }
+                      : { name: entraSecret, value: entraClientSecret }
                   ]
                 : []
             )

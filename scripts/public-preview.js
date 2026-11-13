@@ -13,7 +13,6 @@ const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
 const vaultUri = 'https://kv-agentsdlc-dev-7c77.vault.azure.net/';
 const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77`;
 const authConfigId = `${root}Microsoft.App/containerApps/${names[0]}/authConfigs/current`;
-const entraSecretId = `${vaultId}/secrets/entra-client-secret`;
 const refNames = ['PORTAL_REF', 'GATEWAY_REF', 'ORDERS_REF', 'INVENTORY_REF', 'NOTIFICATIONS_REF'];
 
 function images(refs) {
@@ -42,8 +41,7 @@ function validateTemplate(template) {
   const auth = moduleResources.find(resource => resource.type === 'Microsoft.App/containerApps/authConfigs');
   const moduleParameters = workload?.properties?.parameters;
   const moduleVariables = workload?.properties?.template?.variables;
-  const secret = resources.find(resource => resource.type === 'Microsoft.KeyVault/vaults/secrets');
-  if (resources.length !== 2 || !workload || !app || !auth || !secret ||
+  if (resources.length !== 1 || !workload || !app || !auth ||
       moduleParameters?.isPlaceholder?.value !== false ||
       moduleParameters?.enablePublicIngress?.value !== true ||
       moduleParameters?.enableEntraAuth?.value !== true ||
@@ -58,9 +56,7 @@ function validateTemplate(template) {
       auth.properties?.identityProviders?.azureActiveDirectory?.registration?.clientSecretSettingName !== "[variables('entraSecret')]" ||
       auth.properties?.identityProviders?.azureActiveDirectory?.registration?.openIdIssuer !==
         "[format('https://login.microsoftonline.com/{0}/v2.0', parameters('entraTenantId'))]" ||
-      moduleVariables?.entraSecret !== 'entra-client-secret' ||
-      secret.properties?.value !== "[parameters('entraClientSecret')]" ||
-      secret.properties?.contentType !== 'text/plain') {
+      moduleVariables?.entraSecret !== 'entra-client-secret') {
     throw new Error('Compiled portal authentication is not Entra-protected.');
   }
   const services = workload.properties.template.variables.services;
@@ -88,7 +84,6 @@ function validate(preview, domain, refs, template, clientId, tenantId) {
       `${root}Microsoft.App/containerApps/${name}`.toLowerCase(),
       { kind: 'app', index }
     ]),
-    [entraSecretId.toLowerCase(), { kind: 'secret' }],
     [authConfigId.toLowerCase(), { kind: 'auth' }]
   ]);
   const seen = new Set();
@@ -131,13 +126,22 @@ function validate(preview, domain, refs, template, clientId, tenantId) {
       }
       const secrets = properties.configuration.secrets || [];
       if (target.index === 0) {
-        if (secrets.length !== 1 || !['entra-client-secret', '*******'].includes(secrets[0]?.name)) {
+        if (secrets.length !== 1) {
           throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
         }
         const secret = secrets[0];
+        const unresolved = typeof secret === 'string' &&
+          secret.includes("createObject('name', variables('entraSecret')") &&
+          secret.includes("parameters('entraClientSecret')");
         const vaultReference = `[concat(reference('${vaultId}', '2026-05-15').vaultUri, 'secrets/', 'entra-client-secret')]`;
-        if (secret.identity?.toLowerCase() !== identity.toLowerCase() ||
-            ![`${vaultUri}secrets/entra-client-secret`, vaultReference, '*******'].includes(secret.keyVaultUrl)) {
+        const usesKeyVault = ['entra-client-secret', '*******'].includes(secret?.name) &&
+          secret.identity?.toLowerCase() === identity.toLowerCase() &&
+          [`${vaultUri}secrets/entra-client-secret`, vaultReference, '*******'].includes(secret.keyVaultUrl) &&
+          !Object.prototype.hasOwnProperty.call(secret, 'value');
+        const usesInline = ['entra-client-secret', '*******'].includes(secret?.name) &&
+          Object.prototype.hasOwnProperty.call(secret, 'value') &&
+          !secret.identity && !secret.keyVaultUrl;
+        if (!unresolved && !usesKeyVault && !usesInline) {
           throw new Error('Portal Entra secret is not bound to the approved Key Vault identity.');
         }
       } else if (target.index >= 2) {
@@ -151,12 +155,6 @@ function validate(preview, domain, refs, template, clientId, tenantId) {
         }
       } else if (secrets.length) {
         throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
-      }
-    } else if (target.kind === 'secret') {
-      if (after.type?.toLowerCase() !== 'microsoft.keyvault/vaults/secrets' ||
-          !['[REDACTED]', '*******'].includes(after.properties?.value) ||
-          after.properties?.contentType !== 'text/plain') {
-        throw new Error('Entra client secret is not safely stored in Key Vault.');
       }
     } else {
       const registration = after.properties?.identityProviders?.azureActiveDirectory?.registration;

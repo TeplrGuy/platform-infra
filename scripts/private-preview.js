@@ -27,7 +27,7 @@ function validateTemplate(template) {
       !isDeepStrictEqual(template.variables?.['$fxv#0']?.parameters?.resourceNames?.value, resourceNames) ||
       resourceNames.appInsights !== 'appi-agentsdlc-dev-7c77' ||
       nested.variables?.databaseUrlSecret !== 'postgres-database-url' ||
-      hash(apps.properties?.configuration?.secrets) !== '59ff5caad6c0b764fa8e40923863e229153d754c6cf356fec41e23b3459f0362' ||
+      hash(apps.properties?.configuration?.secrets) !== '5fa310694849fa826c4fb64542fa913183cb994788b9f37668d77d5be945f9e9' ||
       hash(apps.properties?.template?.containers?.[0]?.env) !== '1668e956400eaf480d7c736d54f138b04d59d5ee41e63a2e4d4cb0f31f741747') {
     throw Error('Compiled secret and environment bindings differ from the reviewed template.');
   }
