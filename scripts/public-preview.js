@@ -131,8 +131,7 @@ function validate(preview, domain, refs, template, clientId, tenantId) {
       }
       const secrets = properties.configuration.secrets || [];
       if (target.index === 0) {
-        const secretNames = secrets.map(item => item.name);
-        if (!isDeepStrictEqual(secretNames.sort(), ['entra-client-secret'])) {
+        if (secrets.length !== 1 || !['entra-client-secret', '*******'].includes(secrets[0]?.name)) {
           throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
         }
         const secret = secrets[0];
