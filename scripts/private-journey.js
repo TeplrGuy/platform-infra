@@ -37,10 +37,11 @@ async function journey(domain, orderId, mode, request = fetch, sleep = ms => new
     throw Error(`Unable to warm ${expected}.`);
   }));
   const orderUrl = `${url('apigw')}/api/orders/${orderId}`;
-  const assertOrder = result => {
+  const assertOrder = (result, requireCreatedStatus = false) => {
     const order = result.body.order;
     if (result.status !== 200 || order?.orderId !== orderId || order.customerId !== 'demo-customer' ||
-        order.sku !== 'SKU-100' || order.quantity !== 1 || order.status !== 'created' ||
+        order.sku !== 'SKU-100' || order.quantity !== 1 ||
+        (requireCreatedStatus && order.status !== 'created') ||
         !order.timeline?.some(item => item.stage === 'inventory_reserved') ||
         !order.timeline?.some(item => item.stage === 'notification_accepted')) {
       throw Error('Order verification failed.');
@@ -65,7 +66,7 @@ async function journey(domain, orderId, mode, request = fetch, sleep = ms => new
     });
     const body = await response.json();
     if (response.status !== 201) throw Error(`Order POST returned HTTP ${response.status}; do not retry without reconciliation.`);
-    assertOrder({ status: 200, body });
+    assertOrder({ status: 200, body }, true);
     const after = await get(`${url('inventory')}/inventory/SKU-100`);
     if (after.status !== 200 || after.body.available !== before.body.available - 1) {
       throw Error('Inventory decrement could not be verified; do not retry.');
