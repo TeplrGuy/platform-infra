@@ -165,7 +165,7 @@ function validate(preview, domain, refs, template, clientId, tenantId) {
           after.properties?.globalValidation?.unauthenticatedClientAction !== 'RedirectToLoginPage' ||
           registration?.clientId?.toLowerCase() !== clientId.toLowerCase() ||
           registration?.openIdIssuer !== `https://login.microsoftonline.com/${tenantId}/v2.0` ||
-          registration?.clientSecretSettingName !== 'entra-client-secret') {
+          !['entra-client-secret', '*******'].includes(registration?.clientSecretSettingName)) {
         throw new Error('Portal Entra authentication configuration differs from the approved target.');
       }
     }
