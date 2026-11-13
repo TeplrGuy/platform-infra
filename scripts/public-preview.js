@@ -95,11 +95,12 @@ function validate(preview, domain, refs, template, clientId, tenantId) {
   const active = new Map();
   for (const change of preview.changes) {
     const id = change?.resourceId?.toLowerCase();
-    if (!id || !id.startsWith(root.toLowerCase()) || seen.has(id) || !expected.has(id)) {
+    if (!id || !id.startsWith(root.toLowerCase()) || !expected.has(id)) {
       throw new Error('Public promotion preview contains a duplicate or out-of-scope resource.');
     }
-    seen.add(id);
     if (change.changeType === 'Ignore') continue;
+    if (seen.has(id)) throw new Error('Public promotion preview contains a duplicate or out-of-scope resource.');
+    seen.add(id);
     if (!['Create', 'Modify', 'NoChange'].includes(change.changeType) ||
         change.after?.id?.toLowerCase() !== id) {
       throw new Error('Public promotion preview contains an unsupported resource change.');
