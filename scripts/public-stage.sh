@@ -128,7 +128,7 @@ while IFS= read -r name; do
   app="$(azure "verify-$name" containerapp show --name "$name" --resource-group agtsdlc-dev-rg \
     --query '{state:properties.provisioningState,external:properties.configuration.ingress.external,fqdn:properties.configuration.ingress.fqdn,targetPort:properties.configuration.ingress.targetPort,image:properties.template.containers[0].image}' \
     --output json)"
-  live_apps="$(node -e 'const a=JSON.parse(process.argv[1]); const xs=JSON.parse(process.argv[2]); xs.push(a); process.stdout.write(JSON.stringify(xs));' "$live_apps" "$app")"
+  live_apps="$(node -e 'const a=JSON.parse(process.argv[1]); const xs=JSON.parse(process.argv[2]); xs.push(a); process.stdout.write(JSON.stringify(xs));' "$app" "$live_apps")"
 done < <(node -e 'for(const name of require("./infra/foundation.parameters.json").parameters.appNames.value) console.log(name)')
 printf '%s\n' "$live_apps" > public-live-apps.json
 auth="$(azure public-auth-readback containerapp auth show \
