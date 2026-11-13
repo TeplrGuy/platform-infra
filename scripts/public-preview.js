@@ -129,19 +129,29 @@ function validate(preview, domain, refs, template, clientId, tenantId) {
           properties.template.containers[0].image !== expectedImages[release.services[target.index].key]) {
         throw new Error('Public workload image, ingress, identity, or environment differs from the approved plan.');
       }
-      const secretNames = (properties.configuration.secrets || []).map(item => item.name);
-      const expectedSecrets = target.index === 0 ? ['entra-client-secret']
-        : target.index >= 2 ? ['postgres-database-url'] : [];
-      if (!isDeepStrictEqual(secretNames.sort(), expectedSecrets.sort())) {
-        throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
-      }
+      const secrets = properties.configuration.secrets || [];
       if (target.index === 0) {
-        const secret = properties.configuration.secrets[0];
+        const secretNames = secrets.map(item => item.name);
+        if (!isDeepStrictEqual(secretNames.sort(), ['entra-client-secret'])) {
+          throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
+        }
+        const secret = secrets[0];
         const vaultReference = `[concat(reference('${vaultId}', '2026-05-15').vaultUri, 'secrets/', 'entra-client-secret')]`;
         if (secret.identity?.toLowerCase() !== identity.toLowerCase() ||
             ![`${vaultUri}secrets/entra-client-secret`, vaultReference, '*******'].includes(secret.keyVaultUrl)) {
           throw new Error('Portal Entra secret is not bound to the approved Key Vault identity.');
         }
+      } else if (target.index >= 2) {
+        if (secrets.length !== 1) throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
+        const secret = secrets[0];
+        const unresolved = typeof secret === 'string' &&
+          secret.includes("createObject('name', variables('databaseUrlSecret')") &&
+          secret.includes("'postgres-database-url'");
+        if (!unresolved && secret?.name !== 'postgres-database-url') {
+          throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
+        }
+      } else if (secrets.length) {
+        throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
       }
     } else if (target.kind === 'secret') {
       if (after.type?.toLowerCase() !== 'microsoft.keyvault/vaults/secrets' ||
