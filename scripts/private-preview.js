@@ -7,6 +7,8 @@ const foundation = require('../infra/foundation.parameters.json').parameters;
 const root = '/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/';
 const registry = 'cragentsdlcdev7c77.azurecr.io';
 const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77`;
+const vaultSecret = 'https://kv-agentsdlc-dev-7c77.vault.azure.net/secrets/postgres-database-url';
+const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
 const registryId = `${root}Microsoft.ContainerRegistry/registries/cragentsdlcdev7c77`;
 
 function validateTemplate(template) {
@@ -120,9 +122,16 @@ function validate(preview, domain, refs, template) {
     const secrets = config.secrets || [];
     if (db) {
       const secret = secrets[0] || {};
+      const vaultReference = `[concat(reference('${vaultId}', '2026-05-15').vaultUri, 'secrets/', 'postgres-database-url')]`;
+      const usesKeyVault = [vaultSecret, vaultReference].includes(secret.keyVaultUrl) &&
+        secret.identity?.toLowerCase() === identity.toLowerCase() &&
+        !Object.prototype.hasOwnProperty.call(secret, 'value');
+      const usesInlineValue = Object.prototype.hasOwnProperty.call(secret, 'value') &&
+        !secret.keyVaultUrl && !secret.identity;
       if (!['postgres-database-url', '*******'].includes(vars.get('DATABASE_URL')?.secretRef) || secrets.length !== 1 ||
-          !['postgres-database-url', '*******'].includes(secret.name) || secret.keyVaultUrl || secret.identity ||
-          !Object.prototype.hasOwnProperty.call(secret, 'value')) throw Error('Database secret reference is invalid.');
+          !['postgres-database-url', '*******'].includes(secret.name) || (!usesInlineValue && !usesKeyVault)) {
+        throw Error('Database secret reference is invalid.');
+      }
     } else if (secrets.length || vars.has('DATABASE_URL')) {
       throw Error('Unexpected database secret access.');
     }

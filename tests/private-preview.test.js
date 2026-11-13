@@ -91,6 +91,7 @@ test('masked secret names require the exact compiled bindings', () => {
 test('Azure unresolved references are accepted only for the approved resources', () => {
   const p = preview();
   const envId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77`;
+  const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
   const registryId = `${root}Microsoft.ContainerRegistry/registries/cragentsdlcdev7c77`;
   for (const change of p.changes) {
     const config = change.after.properties.configuration;
@@ -101,11 +102,17 @@ test('Azure unresolved references are accepted only for the approved resources',
         entry.value = `[concat('https://', '${target}', '.internal.', reference('${envId}', '2026-07-01').defaultDomain)]`;
       }
     }
-    if (config.secrets.length) config.secrets[0].value = '*******';
+    if (config.secrets.length) {
+      config.secrets[0] = {
+        name: 'postgres-database-url',
+        keyVaultUrl: `[concat(reference('${vaultId}', '2026-05-15').vaultUri, 'secrets/', 'postgres-database-url')]`,
+        identity: `${root}Microsoft.ManagedIdentity/userAssignedIdentities/${change.resourceId.split('/').at(-1)}-identity`
+      };
+    }
   }
   assert.doesNotThrow(() => check(p));
   p.changes[2].after.properties.configuration.secrets[0].keyVaultUrl =
-    'https://kv-agentsdlc-dev-7c77.vault.azure.net/secrets/postgres-database-url';
+    `[concat(reference('${vaultId}-other', '2026-05-15').vaultUri, 'secrets/', 'postgres-database-url')]`;
   assert.throws(() => check(p), /secret reference/i);
 });
 
