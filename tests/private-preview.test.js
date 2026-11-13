@@ -76,6 +76,13 @@ test('masked secret names require the exact compiled bindings', () => {
     change.after.properties.template.containers[0].env.find(e => e.name === 'DATABASE_URL').secretRef = '*******';
   }
   assert.doesNotThrow(() => check(p));
+  const unresolved = preview();
+  for (const change of unresolved.changes.slice(2)) {
+    change.after.properties.configuration.secrets = [
+      "[if(empty(format('postgresql://agenticsadmin:{0}@{1}:5432/agenticsdldemo?sslmode=require', 'Aa0_PreviewOnly_NotAnActualCredential7c770123456789', reference('/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-agentsdlc-dev-7c77', '2025-08-01').fullyQualifiedDomainName)), createObject('name', variables('databaseUrlSecret'), 'keyVaultUrl', concat(parameters('keyVaultUri'), 'secrets/', variables('databaseUrlSecret')), 'identity', parameters('identityIds')[2]), createObject('name', variables('databaseUrlSecret'), 'value', parameters('databaseUrl')))]"
+    ];
+  }
+  assert.doesNotThrow(() => check(unresolved));
   const altered = structuredClone(template);
   const nested = Object.values(altered.resources)[0].properties.template;
   nested.variables.databaseUrlSecret = 'other-secret';

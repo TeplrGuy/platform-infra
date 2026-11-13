@@ -123,13 +123,19 @@ function validate(preview, domain, refs, template) {
     if (db) {
       const secret = secrets[0] || {};
       const vaultReference = `[concat(reference('${vaultId}', '2026-05-15').vaultUri, 'secrets/', 'postgres-database-url')]`;
+      const isExpression =
+        typeof secret === 'string' &&
+        secret.includes("createObject('name', variables('databaseUrlSecret')") &&
+        secret.includes("'keyVaultUrl'") &&
+        secret.includes("'value', parameters('databaseUrl')");
       const usesKeyVault = [vaultSecret, vaultReference].includes(secret.keyVaultUrl) &&
         secret.identity?.toLowerCase() === identity.toLowerCase() &&
         !Object.prototype.hasOwnProperty.call(secret, 'value');
       const usesInlineValue = Object.prototype.hasOwnProperty.call(secret, 'value') &&
         !secret.keyVaultUrl && !secret.identity;
       if (!['postgres-database-url', '*******'].includes(vars.get('DATABASE_URL')?.secretRef) || secrets.length !== 1 ||
-          !['postgres-database-url', '*******'].includes(secret.name) || (!usesInlineValue && !usesKeyVault)) {
+          (!isExpression &&
+            (!['postgres-database-url', '*******'].includes(secret.name) || (!usesInlineValue && !usesKeyVault)))) {
         throw Error('Database secret reference is invalid.');
       }
     } else if (secrets.length || vars.has('DATABASE_URL')) {
