@@ -1087,7 +1087,7 @@ jobs:
           if-no-files-found: warn
   apply-public-workloads:
     if: ${{ inputs.foundation_action == 'public-apply' }}
-    needs: [preview-public-workloads]
+    needs: [preview-public-workloads, apply-private-health]
     runs-on: ubuntu-24.04
     environment: dev
     timeout-minutes: 60
@@ -1146,7 +1146,7 @@ jobs:
             journey-executions.txt
           if-no-files-found: warn
   preview-private-health:
-    if: ${{ inputs.foundation_action == 'health-preview' || inputs.foundation_action == 'health-apply' }}
+    if: ${{ inputs.foundation_action == 'health-preview' || inputs.foundation_action == 'health-apply' || inputs.foundation_action == 'public-apply' }}
     needs: [validate-bicep, quality]
     runs-on: ubuntu-24.04
     environment: dev
@@ -1178,7 +1178,7 @@ jobs:
             health-template.sha256
           if-no-files-found: warn
   apply-private-health:
-    if: ${{ inputs.foundation_action == 'health-apply' }}
+    if: ${{ inputs.foundation_action == 'health-apply' || inputs.foundation_action == 'public-apply' }}
     needs: [preview-private-health]
     runs-on: ubuntu-24.04
     environment: dev
