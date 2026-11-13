@@ -65,6 +65,41 @@ load_password() {
   export POSTGRES_ADMIN_PASSWORD
 }
 
+ensure_postgres_ready() {
+  local state
+  state="$(azure server-state postgres flexible-server show \
+    --resource-group agtsdlc-dev-rg \
+    --name pg-agentsdlc-dev-7c77 \
+    --query state \
+    --output tsv)"
+  case "$state" in
+    Ready)
+      return 0
+      ;;
+    Stopped)
+      azure server-start postgres flexible-server start \
+        --resource-group agtsdlc-dev-rg \
+        --name pg-agentsdlc-dev-7c77 \
+        --output none
+      ;;
+    *)
+      echo "::error::Unexpected PostgreSQL server state: $state"
+      exit 1
+      ;;
+  esac
+  for _ in {1..30}; do
+    state="$(azure server-poll postgres flexible-server show \
+      --resource-group agtsdlc-dev-rg \
+      --name pg-agentsdlc-dev-7c77 \
+      --query state \
+      --output tsv)"
+    [[ "$state" == Ready ]] && return 0
+    sleep 10
+  done
+  echo "::error::PostgreSQL server did not reach Ready state after start."
+  exit 1
+}
+
 preview() {
   local stage="$1" template="$2" validate_stage="${3:-$1}"
   azure "$stage-what-if" deployment group what-if \
@@ -133,6 +168,7 @@ case "$mode" in
     ;;
   core-preview|core-apply)
     load_password
+    ensure_postgres_ready
     preview core infra/runtime-foundation.bicepparam
     if [[ "$mode" == core-apply ]]; then
       apply core infra/runtime-foundation.bicepparam
@@ -142,6 +178,7 @@ case "$mode" in
     ;;
   recovery-preview|recovery-apply)
     load_password
+    ensure_postgres_ready
     azure server-discovery postgres flexible-server show --resource-group agtsdlc-dev-rg \
       --name pg-agentsdlc-dev-7c77 --query '{state:state,administratorLogin:administratorLogin,version:version}' --output json |
       node -e 'let s=""; process.stdin.on("data", c => s+=c).on("end", () => {
