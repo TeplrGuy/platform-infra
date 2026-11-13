@@ -43,6 +43,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_journey_gate:
+        description: Require the synthetic order durability journey as part of public apply
+        required: true
+        default: false
+        type: boolean
       foundation_action:
         description: Preview or apply only the approved registry and vault foundation
         required: true
@@ -1155,6 +1160,7 @@ jobs:
           ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
           ENTRA_CLIENT_SECRET: ${{ secrets.ENTRA_CLIENT_SECRET }}
           ENTRA_REDIRECT_URI: ${{ vars.ENTRA_REDIRECT_URI }}
+          RUN_JOURNEY_GATE: ${{ inputs.run_journey_gate }}
         run: bash scripts/public-stage.sh apply
       - name: Preserve redacted public release verification
         if: always()

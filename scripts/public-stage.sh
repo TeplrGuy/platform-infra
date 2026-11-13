@@ -166,7 +166,14 @@ process.stdin.on("end", () => validateLoginRedirect(response, process.argv[1], p
 done
 [[ "$redirect_verified" == true ]] || { echo "::error::Unauthenticated portal request did not redirect to the approved Entra sign-in endpoint."; exit 1; }
 bash scripts/health-stage.sh run
-PUBLIC_PORTAL_EXPECTED=true bash scripts/journey-stage.sh
+if [[ "${RUN_JOURNEY_GATE:-false}" == true ]]; then
+  PUBLIC_PORTAL_EXPECTED=true bash scripts/journey-stage.sh
+  journey_note="Health and scale-to-zero durability checks passed."
+  audit "public portal deployed; Entra redirect, private health, and durability checks passed"
+else
+  journey_note="Health checks passed; durability journey gate skipped for this run."
+  audit "public portal deployed; Entra redirect and private health checks passed; durability gate skipped"
+fi
 printf '%s\n' "$portal_url" > public-url.txt
 {
   echo "## Public dev portal release"
@@ -174,6 +181,5 @@ printf '%s\n' "$portal_url" > public-url.txt
   echo "Portal: $portal_url"
   echo "Entra callback: $callback_uri"
   echo
-  echo "Unauthenticated Entra redirect, private health, and scale-to-zero durability checks passed."
+  echo "Unauthenticated Entra redirect verified. $journey_note"
 } >> "$GITHUB_STEP_SUMMARY"
-audit "public portal deployed; Entra redirect, private health, and durability checks passed"

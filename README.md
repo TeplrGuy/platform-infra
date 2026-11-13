@@ -150,8 +150,10 @@ preview in a separate `dev` environment job, compares it with the approved
 artifact, then applies the Entra configuration and public portal ingress.
 It reads back all five app images and ingress settings, checks the portal
 callback URL, requires anonymous requests to redirect to the configured Entra
-tenant/client, then runs the in-environment health and scale-to-zero durability
-journey. The workflow reports the portal URL only after those checks pass.
+tenant/client, then runs the in-environment health check. The synthetic
+scale-to-zero durability journey remains available as an explicit gate by
+setting `run_journey_gate: true` on workflow dispatch. The workflow reports the
+portal URL after the active gates pass.
 Public promotion refuses input refs that differ from `infra/private-release.json`;
 updating that manifest requires an independently reviewed, immutable publisher
 record. A newer feature PR is not deployable merely because its source SHA was
@@ -210,6 +212,6 @@ this workflow change is reviewed and merged to the default branch.
 1. Start with a GitHub issue and acceptance criteria in one of the service repos.
 2. Implement in a short-lived branch, open a PR, and link the issue.
 3. Use PR checklist + CODEOWNERS + `ci` + `security` workflows as merge gates.
-4. For a live demo, use only a reviewed immutable release through the staged private and public `dev` actions; the public portal requires Entra sign-in and its URL is reported only after health and durability checks pass.
+4. For a live demo, use only a reviewed immutable release through the staged private and public `dev` actions; the public portal requires Entra sign-in and its URL is reported after redirect and health checks (optionally add `run_journey_gate: true` when you also need durability evidence in the same run).
 5. Test, production, and rollback releases remain blocked until their resource scopes and verified image rollback paths are independently implemented.
 6. Use `portal-web` to demonstrate the visible customer flow and link the runtime behavior back to GitHub issues, PRs, and workflows.
