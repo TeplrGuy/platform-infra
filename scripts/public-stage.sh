@@ -143,22 +143,28 @@ validateLive(JSON.parse(fs.readFileSync('public-live-apps.json', 'utf8')),
   JSON.parse(process.argv[2]), process.argv[3], refs, process.argv[4], process.argv[5]);
 NODE
 redirect=''
+redirect_verified=false
 for attempt in {1..20}; do
-  if redirect="$(curl --silent --show-error --max-time 30 --max-redirs 0 --dump-header - \
+  if ! redirect="$(curl --silent --show-error --max-time 30 --max-redirs 0 --dump-header - \
     --output /dev/null --write-out $'\n%{http_code}' "$portal_url")"; then
-    break
+    audit "retrying portal redirect probe attempt=$attempt"
+    sleep 15
+    continue
   fi
-  audit "retrying portal redirect probe attempt=$attempt"
-  sleep 15
-done
-[[ -n "$redirect" ]] || { echo "::error::Unable to reach the public portal URL for Entra redirect verification."; exit 1; }
-printf '%s' "$redirect" | node -e '
+  if printf '%s' "$redirect" | node -e '
 const { validateLoginRedirect } = require("./scripts/public-preview");
 let response = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", chunk => response += chunk);
 process.stdin.on("end", () => validateLoginRedirect(response, process.argv[1], process.argv[2]));
-' "$ENTRA_CLIENT_ID" "$ENTRA_TENANT_ID"
+' "$ENTRA_CLIENT_ID" "$ENTRA_TENANT_ID"; then
+    redirect_verified=true
+    break
+  fi
+  audit "retrying portal redirect probe attempt=$attempt"
+  sleep 15
+done
+[[ "$redirect_verified" == true ]] || { echo "::error::Unauthenticated portal request did not redirect to the approved Entra sign-in endpoint."; exit 1; }
 bash scripts/health-stage.sh run
 PUBLIC_PORTAL_EXPECTED=true bash scripts/journey-stage.sh
 printf '%s\n' "$portal_url" > public-url.txt
