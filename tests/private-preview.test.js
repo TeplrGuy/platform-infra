@@ -57,7 +57,7 @@ test('private preview requires pinned source revisions and five private applicat
   assert.throws(() => images({ ...refs, PORTAL_REF: '0'.repeat(40) }), /provenance/);
   for (const mutate of [
     p => { p.changes.pop(); },
-    p => { p.changes[0].changeType = 'Modify'; },
+    p => { p.changes[0].changeType = 'Delete'; },
     p => { p.changes[0].after.properties.configuration.ingress.external = true; },
     p => { p.changes[1].after.properties.template.containers[0].image += ':latest'; },
     p => { p.changes[2].after.properties.configuration.secrets[0].identity = 'wrong'; },
