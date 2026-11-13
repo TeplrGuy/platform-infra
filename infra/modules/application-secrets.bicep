@@ -11,10 +11,20 @@ resource vault 'Microsoft.KeyVault/vaults@2026-05-15' existing = {
 resource databaseSecret 'Microsoft.KeyVault/vaults/secrets@2026-05-15' = {
   parent: vault
   name: 'postgres-database-url'
-  properties: { value: databaseUrl }
+  properties: {
+    value: databaseUrl
+    attributes: {
+      enabled: true
+    }
+  }
 }
 resource entraSecret 'Microsoft.KeyVault/vaults/secrets@2026-05-15' = if (enableEntraAuth) {
   parent: vault
   name: 'entra-client-secret'
-  properties: { value: entraClientSecret }
+  properties: {
+    value: entraClientSecret
+    attributes: {
+      enabled: true
+    }
+  }
 }

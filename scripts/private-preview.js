@@ -27,7 +27,7 @@ function validateTemplate(template) {
       !isDeepStrictEqual(template.variables?.['$fxv#0']?.parameters?.resourceNames?.value, resourceNames) ||
       resourceNames.appInsights !== 'appi-agentsdlc-dev-7c77' ||
       nested.variables?.databaseUrlSecret !== 'postgres-database-url' ||
-      hash(apps.properties?.configuration?.secrets) !== '0d83a39080e111b8a1a26b4a0bdba68e913c875d6b02c8cea52d7bfb479e5490' ||
+      hash(apps.properties?.configuration?.secrets) !== '5fa310694849fa826c4fb64542fa913183cb994788b9f37668d77d5be945f9e9' ||
       hash(apps.properties?.template?.containers?.[0]?.env) !== '1668e956400eaf480d7c736d54f138b04d59d5ee41e63a2e4d4cb0f31f741747') {
     throw Error('Compiled secret and environment bindings differ from the reviewed template.');
   }
@@ -37,7 +37,7 @@ function images(refs) {
   const keys = ['portal', 'apiGateway', 'orders', 'inventory', 'notifications'];
   const names = ['portal-web', 'api-gateway', 'orders-service', 'inventory-service', 'notifications-service'];
   const refNames = ['PORTAL_REF', 'GATEWAY_REF', 'ORDERS_REF', 'INVENTORY_REF', 'NOTIFICATIONS_REF'];
-  if (release.publisherRun !== '43133264052' || release.services.length !== 5) throw Error('Image provenance is incomplete.');
+  if (release.publisherRun !== '43311421332' || release.services.length !== 5) throw Error('Image provenance is incomplete.');
   return Object.fromEntries(release.services.map((service, i) => {
     if (service.key !== keys[i] || service.name !== names[i] || service.refEnv !== refNames[i] ||
         !/^[a-f0-9]{40}$/.test(service.revision) || refs[service.refEnv] !== service.revision ||
@@ -62,10 +62,10 @@ function validate(preview, domain, refs, template) {
     if (!id || !id.startsWith(root.toLowerCase()) || seen.has(id)) throw Error('Duplicate or out-of-scope resource.');
     seen.add(id);
     if (change.changeType === 'Ignore') continue;
-    if (!expected.has(id) || change.changeType !== 'Create' ||
+    if (!expected.has(id) || !['Create', 'Modify'].includes(change.changeType) ||
         change.after?.id?.toLowerCase() !== id ||
         change.after?.type?.toLowerCase() !== 'microsoft.app/containerapps') {
-      throw Error('Only creation of the five intended Container Apps is allowed.');
+      throw Error('Only create or modify operations for the five intended Container Apps are allowed.');
     }
     const i = expected.get(id);
     const app = change.after;
@@ -80,7 +80,8 @@ function validate(preview, domain, refs, template) {
       if (app.tags?.[key] !== value) throw Error('Application tags differ from the approved plan.');
     }
     const config = properties.configuration;
-    if (config?.ingress?.external !== false || config.ingress.targetPort !== 3000 || config.ingress.transport !== 'auto' ||
+    if (config?.ingress?.external !== false || config.ingress.targetPort !== 3000 ||
+        String(config.ingress.transport || '').toLowerCase() !== 'auto' ||
         config.activeRevisionsMode !== 'Single' || config.registries?.length !== 1 ||
         ![registry, `[reference('${registryId}', '2025-11-01').loginServer]`].includes(config.registries[0].server) ||
         config.registries[0].identity?.toLowerCase() !== identity.toLowerCase()) {
@@ -120,10 +121,23 @@ function validate(preview, domain, refs, template) {
     }
     const secrets = config.secrets || [];
     if (db) {
+      const secret = secrets[0] || {};
       const vaultReference = `[concat(reference('${vaultId}', '2026-05-15').vaultUri, 'secrets/', 'postgres-database-url')]`;
+      const isExpression =
+        typeof secret === 'string' &&
+        secret.includes("createObject('name', variables('databaseUrlSecret')") &&
+        secret.includes("'keyVaultUrl'") &&
+        secret.includes("'value', parameters('databaseUrl')");
+      const usesKeyVault = [vaultSecret, vaultReference].includes(secret.keyVaultUrl) &&
+        secret.identity?.toLowerCase() === identity.toLowerCase() &&
+        !Object.prototype.hasOwnProperty.call(secret, 'value');
+      const usesInlineValue = Object.prototype.hasOwnProperty.call(secret, 'value') &&
+        !secret.keyVaultUrl && !secret.identity;
       if (!['postgres-database-url', '*******'].includes(vars.get('DATABASE_URL')?.secretRef) || secrets.length !== 1 ||
-          !['postgres-database-url', '*******'].includes(secrets[0].name) || ![vaultSecret, vaultReference].includes(secrets[0].keyVaultUrl) ||
-          secrets[0].identity?.toLowerCase() !== identity.toLowerCase()) throw Error('Database secret reference is invalid.');
+          (!isExpression &&
+            (!['postgres-database-url', '*******'].includes(secret.name) || (!usesInlineValue && !usesKeyVault)))) {
+        throw Error('Database secret reference is invalid.');
+      }
     } else if (secrets.length || vars.has('DATABASE_URL')) {
       throw Error('Unexpected database secret access.');
     }

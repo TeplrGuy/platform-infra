@@ -13,11 +13,10 @@ const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
 const vaultUri = 'https://kv-agentsdlc-dev-7c77.vault.azure.net/';
 const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77`;
 const authConfigId = `${root}Microsoft.App/containerApps/${names[0]}/authConfigs/current`;
-const entraSecretId = `${vaultId}/secrets/entra-client-secret`;
 const refNames = ['PORTAL_REF', 'GATEWAY_REF', 'ORDERS_REF', 'INVENTORY_REF', 'NOTIFICATIONS_REF'];
 
 function images(refs) {
-  if (release.publisherRun !== '43133264052' || release.services.length !== 5) {
+  if (release.publisherRun !== '43311421332' || release.services.length !== 5) {
     throw new Error('Public promotion requires the complete pinned private release.');
   }
   return Object.fromEntries(release.services.map((service, index) => {
@@ -42,8 +41,7 @@ function validateTemplate(template) {
   const auth = moduleResources.find(resource => resource.type === 'Microsoft.App/containerApps/authConfigs');
   const moduleParameters = workload?.properties?.parameters;
   const moduleVariables = workload?.properties?.template?.variables;
-  const secret = resources.find(resource => resource.type === 'Microsoft.KeyVault/vaults/secrets');
-  if (resources.length !== 2 || !workload || !app || !auth || !secret ||
+  if (resources.length !== 1 || !workload || !app || !auth ||
       moduleParameters?.isPlaceholder?.value !== false ||
       moduleParameters?.enablePublicIngress?.value !== true ||
       moduleParameters?.enableEntraAuth?.value !== true ||
@@ -58,9 +56,7 @@ function validateTemplate(template) {
       auth.properties?.identityProviders?.azureActiveDirectory?.registration?.clientSecretSettingName !== "[variables('entraSecret')]" ||
       auth.properties?.identityProviders?.azureActiveDirectory?.registration?.openIdIssuer !==
         "[format('https://login.microsoftonline.com/{0}/v2.0', parameters('entraTenantId'))]" ||
-      moduleVariables?.entraSecret !== 'entra-client-secret' ||
-      secret.properties?.value !== "[parameters('entraClientSecret')]" ||
-      secret.properties?.contentType !== 'text/plain') {
+      moduleVariables?.entraSecret !== 'entra-client-secret') {
     throw new Error('Compiled portal authentication is not Entra-protected.');
   }
   const services = workload.properties.template.variables.services;
@@ -88,18 +84,20 @@ function validate(preview, domain, refs, template, clientId, tenantId) {
       `${root}Microsoft.App/containerApps/${name}`.toLowerCase(),
       { kind: 'app', index }
     ]),
-    [entraSecretId.toLowerCase(), { kind: 'secret' }],
     [authConfigId.toLowerCase(), { kind: 'auth' }]
   ]);
   const seen = new Set();
   const active = new Map();
   for (const change of preview.changes) {
     const id = change?.resourceId?.toLowerCase();
-    if (!id || !id.startsWith(root.toLowerCase()) || seen.has(id) || !expected.has(id)) {
+    if (!id || !id.startsWith(root.toLowerCase())) {
+      throw new Error('Public promotion preview contains a duplicate or out-of-scope resource.');
+    }
+    if (change.changeType === 'Ignore') continue;
+    if (seen.has(id) || !expected.has(id)) {
       throw new Error('Public promotion preview contains a duplicate or out-of-scope resource.');
     }
     seen.add(id);
-    if (change.changeType === 'Ignore') continue;
     if (!['Create', 'Modify', 'NoChange'].includes(change.changeType) ||
         change.after?.id?.toLowerCase() !== id) {
       throw new Error('Public promotion preview contains an unsupported resource change.');
@@ -126,25 +124,37 @@ function validate(preview, domain, refs, template, clientId, tenantId) {
           properties.template.containers[0].image !== expectedImages[release.services[target.index].key]) {
         throw new Error('Public workload image, ingress, identity, or environment differs from the approved plan.');
       }
-      const secretNames = (properties.configuration.secrets || []).map(item => item.name);
-      const expectedSecrets = target.index === 0 ? ['entra-client-secret']
-        : target.index >= 2 ? ['postgres-database-url'] : [];
-      if (!isDeepStrictEqual(secretNames.sort(), expectedSecrets.sort())) {
-        throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
-      }
+      const secrets = properties.configuration.secrets || [];
       if (target.index === 0) {
-        const secret = properties.configuration.secrets[0];
+        if (secrets.length !== 1) {
+          throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
+        }
+        const secret = secrets[0];
+        const unresolved = typeof secret === 'string' &&
+          secret.includes("createObject('name', variables('entraSecret')") &&
+          secret.includes("parameters('entraClientSecret')");
         const vaultReference = `[concat(reference('${vaultId}', '2026-05-15').vaultUri, 'secrets/', 'entra-client-secret')]`;
-        if (secret.identity?.toLowerCase() !== identity.toLowerCase() ||
-            ![`${vaultUri}secrets/entra-client-secret`, vaultReference, '*******'].includes(secret.keyVaultUrl)) {
+        const usesKeyVault = ['entra-client-secret', '*******'].includes(secret?.name) &&
+          secret.identity?.toLowerCase() === identity.toLowerCase() &&
+          [`${vaultUri}secrets/entra-client-secret`, vaultReference, '*******'].includes(secret.keyVaultUrl) &&
+          !Object.prototype.hasOwnProperty.call(secret, 'value');
+        const usesInline = ['entra-client-secret', '*******'].includes(secret?.name) &&
+          Object.prototype.hasOwnProperty.call(secret, 'value') &&
+          !secret.identity && !secret.keyVaultUrl;
+        if (!unresolved && !usesKeyVault && !usesInline) {
           throw new Error('Portal Entra secret is not bound to the approved Key Vault identity.');
         }
-      }
-    } else if (target.kind === 'secret') {
-      if (after.type?.toLowerCase() !== 'microsoft.keyvault/vaults/secrets' ||
-          !['[REDACTED]', '*******'].includes(after.properties?.value) ||
-          after.properties?.contentType !== 'text/plain') {
-        throw new Error('Entra client secret is not safely stored in Key Vault.');
+      } else if (target.index >= 2) {
+        if (secrets.length !== 1) throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
+        const secret = secrets[0];
+        const unresolved = typeof secret === 'string' &&
+          secret.includes("createObject('name', variables('databaseUrlSecret')") &&
+          secret.includes("parameters('databaseUrl')");
+        if (!unresolved && secret?.name !== 'postgres-database-url') {
+          throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
+        }
+      } else if (secrets.length) {
+        throw new Error('Public workload Key Vault secret bindings differ from the approved plan.');
       }
     } else {
       const registration = after.properties?.identityProviders?.azureActiveDirectory?.registration;
@@ -153,7 +163,7 @@ function validate(preview, domain, refs, template, clientId, tenantId) {
           after.properties?.globalValidation?.unauthenticatedClientAction !== 'RedirectToLoginPage' ||
           registration?.clientId?.toLowerCase() !== clientId.toLowerCase() ||
           registration?.openIdIssuer !== `https://login.microsoftonline.com/${tenantId}/v2.0` ||
-          registration?.clientSecretSettingName !== 'entra-client-secret') {
+          !['entra-client-secret', '*******'].includes(registration?.clientSecretSettingName)) {
         throw new Error('Portal Entra authentication configuration differs from the approved target.');
       }
     }
@@ -204,6 +214,12 @@ function validateLive(apps, auth, domain, refs, clientId, tenantId) {
 function validateLoginRedirect(response, clientId, tenantId) {
   const status = response.match(/(?:^|\r?\n)HTTP\/\S+\s+(\d{3})\s/m)?.[1];
   const location = response.match(/^location:\s*(\S+)/im)?.[1];
+  if (status === '401') {
+    const authenticate = response.match(/^www-authenticate:\s*(.+)$/im)?.[1] || '';
+    const expectedAuthorize = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`;
+    const resourceId = authenticate.match(/resource_id=\"([^\"]+)\"/i)?.[1];
+    if (authenticate.includes(expectedAuthorize) && resourceId?.toLowerCase() === clientId.toLowerCase()) return;
+  }
   let redirect;
   try {
     redirect = new URL(location);

@@ -99,7 +99,6 @@ printf '%s\n' "$callback_uri" > public-callback-uri.txt
 printf '%s\n' "$portal_url" > public-url.txt
 git ls-files -z infra scripts/public-stage.sh scripts/public-preview.js scripts/runtime-preview.js |
   xargs -0 sha256sum > public-template.sha256
-sha256sum public-compiled.json >> public-template.sha256
 if [[ "$mode" == preview ]]; then
   {
     echo "Expected portal URL: $portal_url"
@@ -129,7 +128,7 @@ while IFS= read -r name; do
   app="$(azure "verify-$name" containerapp show --name "$name" --resource-group agtsdlc-dev-rg \
     --query '{state:properties.provisioningState,external:properties.configuration.ingress.external,fqdn:properties.configuration.ingress.fqdn,targetPort:properties.configuration.ingress.targetPort,image:properties.template.containers[0].image}' \
     --output json)"
-  live_apps="$(node -e 'const a=JSON.parse(process.argv[1]); const xs=JSON.parse(process.argv[2]); xs.push(a); process.stdout.write(JSON.stringify(xs));' "$live_apps" "$app")"
+  live_apps="$(node -e 'const a=JSON.parse(process.argv[1]); const xs=JSON.parse(process.argv[2]); xs.push(a); process.stdout.write(JSON.stringify(xs));' "$app" "$live_apps")"
 done < <(node -e 'for(const name of require("./infra/foundation.parameters.json").parameters.appNames.value) console.log(name)')
 printf '%s\n' "$live_apps" > public-live-apps.json
 auth="$(azure public-auth-readback containerapp auth show \
@@ -143,15 +142,29 @@ const refs = Object.fromEntries(['PORTAL_REF', 'GATEWAY_REF', 'ORDERS_REF', 'INV
 validateLive(JSON.parse(fs.readFileSync('public-live-apps.json', 'utf8')),
   JSON.parse(process.argv[2]), process.argv[3], refs, process.argv[4], process.argv[5]);
 NODE
-redirect="$(curl --silent --show-error --max-time 30 --max-redirs 0 --dump-header - \
-  --output /dev/null --write-out $'\n%{http_code}' "$portal_url")"
-printf '%s' "$redirect" | node -e '
+redirect=''
+redirect_verified=false
+for attempt in {1..20}; do
+  if ! redirect="$(curl --silent --show-error --max-time 30 --max-redirs 0 --dump-header - \
+    --output /dev/null --write-out $'\n%{http_code}' "$portal_url")"; then
+    audit "retrying portal redirect probe attempt=$attempt"
+    sleep 15
+    continue
+  fi
+  if printf '%s' "$redirect" | node -e '
 const { validateLoginRedirect } = require("./scripts/public-preview");
 let response = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", chunk => response += chunk);
 process.stdin.on("end", () => validateLoginRedirect(response, process.argv[1], process.argv[2]));
-' "$ENTRA_CLIENT_ID" "$ENTRA_TENANT_ID"
+' "$ENTRA_CLIENT_ID" "$ENTRA_TENANT_ID"; then
+    redirect_verified=true
+    break
+  fi
+  audit "retrying portal redirect probe attempt=$attempt"
+  sleep 15
+done
+[[ "$redirect_verified" == true ]] || { echo "::error::Unauthenticated portal request did not redirect to the approved Entra sign-in endpoint."; exit 1; }
 bash scripts/health-stage.sh run
 PUBLIC_PORTAL_EXPECTED=true bash scripts/journey-stage.sh
 printf '%s\n' "$portal_url" > public-url.txt

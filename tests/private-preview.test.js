@@ -34,8 +34,7 @@ function preview() {
       ...Object.entries(urls).map(([name, target]) => ({ name, value: `https://${names[target]}.internal.${domain}` })),
       ...(i >= 2 ? [{ name: 'DATABASE_URL', secretRef: 'postgres-database-url' }] : [])
     ];
-    const secrets = i >= 2 ? [{ name: 'postgres-database-url',
-      keyVaultUrl: 'https://kv-agentsdlc-dev-7c77.vault.azure.net/secrets/postgres-database-url', identity }] : [];
+    const secrets = i >= 2 ? [{ name: 'postgres-database-url', value: '*******' }] : [];
     return { changeType: 'Create', resourceId: id, after: {
       id, type: 'Microsoft.App/containerApps', location: 'northeurope', tags: foundation.tags.value,
       identity: { type: 'UserAssigned', userAssignedIdentities: { [identity]: {} } },
@@ -57,7 +56,7 @@ test('private preview requires pinned source revisions and five private applicat
   assert.throws(() => images({ ...refs, PORTAL_REF: '0'.repeat(40) }), /provenance/);
   for (const mutate of [
     p => { p.changes.pop(); },
-    p => { p.changes[0].changeType = 'Modify'; },
+    p => { p.changes[0].changeType = 'Delete'; },
     p => { p.changes[0].after.properties.configuration.ingress.external = true; },
     p => { p.changes[1].after.properties.template.containers[0].image += ':latest'; },
     p => { p.changes[2].after.properties.configuration.secrets[0].identity = 'wrong'; },
@@ -77,6 +76,13 @@ test('masked secret names require the exact compiled bindings', () => {
     change.after.properties.template.containers[0].env.find(e => e.name === 'DATABASE_URL').secretRef = '*******';
   }
   assert.doesNotThrow(() => check(p));
+  const unresolved = preview();
+  for (const change of unresolved.changes.slice(2)) {
+    change.after.properties.configuration.secrets = [
+      "[if(empty(format('postgresql://agenticsadmin:{0}@{1}:5432/agenticsdldemo?sslmode=require', 'Aa0_PreviewOnly_NotAnActualCredential7c770123456789', reference('/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/Microsoft.DBforPostgreSQL/flexibleServers/pg-agentsdlc-dev-7c77', '2025-08-01').fullyQualifiedDomainName)), createObject('name', variables('databaseUrlSecret'), 'keyVaultUrl', concat(parameters('keyVaultUri'), 'secrets/', variables('databaseUrlSecret')), 'identity', parameters('identityIds')[2]), createObject('name', variables('databaseUrlSecret'), 'value', parameters('databaseUrl')))]"
+    ];
+  }
+  assert.doesNotThrow(() => check(unresolved));
   const altered = structuredClone(template);
   const nested = Object.values(altered.resources)[0].properties.template;
   nested.variables.databaseUrlSecret = 'other-secret';
@@ -104,7 +110,11 @@ test('Azure unresolved references are accepted only for the approved resources',
       }
     }
     if (config.secrets.length) {
-      config.secrets[0].keyVaultUrl = `[concat(reference('${vaultId}', '2026-05-15').vaultUri, 'secrets/', 'postgres-database-url')]`;
+      config.secrets[0] = {
+        name: 'postgres-database-url',
+        keyVaultUrl: `[concat(reference('${vaultId}', '2026-05-15').vaultUri, 'secrets/', 'postgres-database-url')]`,
+        identity: `${root}Microsoft.ManagedIdentity/userAssignedIdentities/${change.resourceId.split('/').at(-1)}-identity`
+      };
     }
   }
   assert.doesNotThrow(() => check(p));

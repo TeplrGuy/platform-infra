@@ -52,15 +52,6 @@ function preview() {
   });
   changes.push({
     changeType: 'Create',
-    resourceId: `${vaultId}/secrets/entra-client-secret`,
-    after: {
-      id: `${vaultId}/secrets/entra-client-secret`,
-      type: 'Microsoft.KeyVault/vaults/secrets',
-      properties: { value: '[REDACTED]', contentType: 'text/plain' }
-    }
-  });
-  changes.push({
-    changeType: 'Create',
     resourceId: `${root}Microsoft.App/containerApps/${names[0]}/authConfigs/current`,
     after: {
       id: `${root}Microsoft.App/containerApps/${names[0]}/authConfigs/current`,
@@ -108,8 +99,8 @@ test('public what-if accepts only the pinned images and Entra-protected portal s
   for (const mutate of [
     p => { p.changes[1].after.properties.configuration.ingress.external = true; },
     p => { p.changes[0].after.properties.template.containers[0].image += ':latest'; },
-    p => { p.changes[5].after.properties.value = 'unredacted'; },
-    p => { p.changes[6].after.properties.identityProviders.azureActiveDirectory.registration.clientId = 'wrong'; },
+    p => { p.changes[0].after.properties.configuration.secrets[0].name = 'wrong-secret'; },
+    p => { p.changes[5].after.properties.identityProviders.azureActiveDirectory.registration.clientId = 'wrong'; },
     p => { p.changes.pop(); },
     p => { p.changes[0].resourceId = `${root}Microsoft.App/containerApps/other`; }
   ]) {
@@ -145,6 +136,8 @@ test('public apply rejects a changed preview and live resource/auth drift', () =
 test('anonymous portal smoke test requires the approved Entra authorization redirect', () => {
   const response = `HTTP/2 302 Found\r\nlocation: https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code\r\n`;
   assert.doesNotThrow(() => validateLoginRedirect(response, clientId, tenantId));
+  const challenge = `HTTP/2 401 Unauthorized\r\nwww-authenticate: Bearer realm=\"example\" authorization_uri=\"https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize\" resource_id=\"${clientId}\"\r\n`;
+  assert.doesNotThrow(() => validateLoginRedirect(challenge, clientId, tenantId));
   assert.throws(() => validateLoginRedirect('HTTP/2 200 OK\r\n', clientId, tenantId));
   assert.throws(() => validateLoginRedirect(response.replace(tenantId, '00000000-0000-0000-0000-000000000000'), clientId, tenantId));
   assert.throws(() => validateLoginRedirect(response.replace(clientId, 'c0ffee00-0000-0000-0000-000000000000'), clientId, tenantId));

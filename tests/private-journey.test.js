@@ -15,6 +15,9 @@ function fixture(options = {}) {
   let posts = 0;
   const request = async (url, init) => {
     if (url.endsWith('/health')) {
+      if (options.portalAuthChallenge && url.includes('-7c77-portal.')) {
+        return { status: 401, headers: { get: () => 'Bearer authorization_uri=\"https://login.microsoftonline.com/16b3c013-d300-468d-ac64-7eda0820b6d3/oauth2/v2.0/authorize\"' } };
+      }
       const match = [['portal', 'portal-web'], ['apigw', 'api-gateway'], ['orders', 'orders-service'],
         ['inventory', 'inventory-service'], ['notify', 'notifications-service']]
         .find(([name]) => url.includes(`-7c77-${name}.`));
@@ -35,7 +38,7 @@ function fixture(options = {}) {
 }
 
 test('one synthetic order verifies reservation, readback and notification', async () => {
-  const f = fixture();
+  const f = fixture({ portalAuthChallenge: true });
   await journey(domain, id, 'create', f.request, async () => {});
   assert.equal(f.posts(), 1);
 });

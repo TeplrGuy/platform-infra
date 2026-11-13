@@ -13,6 +13,7 @@ var foundation = loadJsonContent('foundation.parameters.json').parameters
 var release = loadJsonContent('private-release.json')
 var appNames = foundation.appNames.value
 var identityIds = [for name in appNames: resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', '${name}-identity')]
+var runtimePostgresPassword = 'Aa0_PreviewOnly_NotAnActualCredential7c770123456789'
 var containerImages = {
   portal: 'cragentsdlcdev7c77.azurecr.io/${release.services[0].name}@${release.services[0].digest}'
   apiGateway: 'cragentsdlcdev7c77.azurecr.io/${release.services[1].name}@${release.services[1].digest}'
@@ -33,30 +34,18 @@ resource registry 'Microsoft.ContainerRegistry/registries@2025-11-01' existing =
   name: names.registry
 }
 
-resource vault 'Microsoft.KeyVault/vaults@2026-05-15' existing = {
-  name: names.keyVault
-}
-
-resource entraSecret 'Microsoft.KeyVault/vaults/secrets@2026-05-15' = {
-  parent: vault
-  name: 'entra-client-secret'
-  properties: {
-    value: entraClientSecret
-    contentType: 'text/plain'
-  }
+resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2025-08-01' existing = {
+  name: names.postgres
 }
 
 module apps 'modules/container-apps.bicep' = {
   name: 'public-workloads'
-  dependsOn: [
-    entraSecret
-  ]
   params: {
     environmentId: environment.id
     environmentDefaultDomain: environment.properties.defaultDomain
     registryLoginServer: registry.properties.loginServer
     appInsightsConnectionString: insights.properties.ConnectionString
-    keyVaultUri: vault.properties.vaultUri
+    keyVaultUri: ''
     appNames: appNames
     identityIds: identityIds
     containerImage: ''
@@ -68,6 +57,8 @@ module apps 'modules/container-apps.bicep' = {
     tags: foundation.tags.value
     entraClientId: entraClientId
     entraTenantId: entraTenantId
+    entraClientSecret: entraClientSecret
+    databaseUrl: 'postgresql://agenticsadmin:${uriComponent(runtimePostgresPassword)}@${postgres.properties.fullyQualifiedDomainName}:5432/agenticsdldemo?sslmode=require'
   }
 }
 

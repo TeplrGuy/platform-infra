@@ -65,14 +65,59 @@ load_password() {
   export POSTGRES_ADMIN_PASSWORD
 }
 
+ensure_postgres_ready() {
+  local state
+  state="$(azure server-state postgres flexible-server show \
+    --resource-group agtsdlc-dev-rg \
+    --name pg-agentsdlc-dev-7c77 \
+    --query state \
+    --output tsv)"
+  case "$state" in
+    Ready)
+      return 0
+      ;;
+    Stopped)
+      azure server-start postgres flexible-server start \
+        --resource-group agtsdlc-dev-rg \
+        --name pg-agentsdlc-dev-7c77 \
+        --output none
+      ;;
+    *)
+      echo "::error::Unexpected PostgreSQL server state: $state"
+      exit 1
+      ;;
+  esac
+  for _ in {1..30}; do
+    state="$(azure server-poll postgres flexible-server show \
+      --resource-group agtsdlc-dev-rg \
+      --name pg-agentsdlc-dev-7c77 \
+      --query state \
+      --output tsv)"
+    [[ "$state" == Ready ]] && return 0
+    sleep 10
+  done
+  echo "::error::PostgreSQL server did not reach Ready state after start."
+  exit 1
+}
+
 preview() {
-  local stage="$1" template="$2"
+  local stage="$1" template="$2" validate_stage="${3:-$1}"
   azure "$stage-what-if" deployment group what-if \
     --name "runtime-$stage-preview-$GITHUB_RUN_ID" --resource-group agtsdlc-dev-rg \
     --parameters "$template" --no-pretty-print --no-prompt --output json |
     node scripts/runtime-preview.js sanitize > runtime-what-if.json
-  node scripts/runtime-preview.js "$stage" runtime-what-if.json
+  node scripts/runtime-preview.js "$validate_stage" runtime-what-if.json
   git ls-files -z infra scripts/runtime-stage.sh scripts/runtime-preview.js | xargs -0 sha256sum > runtime-template.sha256
+}
+
+secrets_change_type() {
+  node -e '
+const fs = require("node:fs");
+const p = JSON.parse(fs.readFileSync("runtime-what-if.json", "utf8"));
+const root = "/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/microsoft.keyvault/vaults/kv-agentsdlc-dev-7c77/secrets/postgres-admin-password";
+const c = (p.changes || []).find(x => (x.resourceId || "").toLowerCase() === root);
+process.stdout.write(c?.changeType || "NoChange");
+'
 }
 
 apply() {
@@ -93,9 +138,23 @@ case "$mode" in
       audit "credential-reuse no credential change requested"
     else
       require_new_database
-      echo "seed_required=true" >> "$GITHUB_OUTPUT"
       export POSTGRES_ADMIN_PASSWORD="$RUNTIME_POSTGRES_PASSWORD"
-      preview secrets infra/runtime-secrets.bicepparam
+      preview secrets infra/runtime-secrets.bicepparam secrets-check
+      change_type="$(secrets_change_type)"
+      case "$change_type" in
+        Create)
+          require_new_database
+          echo "seed_required=true" >> "$GITHUB_OUTPUT"
+          ;;
+        Modify|NoChange)
+          echo "seed_required=false" >> "$GITHUB_OUTPUT"
+          audit "credential-reuse no credential change requested"
+          ;;
+        *)
+          echo "::error::Unexpected runtime secret change type: $change_type"
+          exit 1
+          ;;
+      esac
     fi
     ;;
   secrets-apply)
@@ -115,6 +174,7 @@ case "$mode" in
     ;;
   core-preview|core-apply)
     load_password
+    ensure_postgres_ready
     preview core infra/runtime-foundation.bicepparam
     if [[ "$mode" == core-apply ]]; then
       apply core infra/runtime-foundation.bicepparam
@@ -124,6 +184,7 @@ case "$mode" in
     ;;
   recovery-preview|recovery-apply)
     load_password
+    ensure_postgres_ready
     azure server-discovery postgres flexible-server show --resource-group agtsdlc-dev-rg \
       --name pg-agentsdlc-dev-7c77 --query '{state:state,administratorLogin:administratorLogin,version:version}' --output json |
       node -e 'let s=""; process.stdin.on("data", c => s+=c).on("end", () => {

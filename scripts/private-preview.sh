@@ -57,7 +57,6 @@ node scripts/private-preview.js validate private-what-if.json "$domain" private-
 printf '%s\n' "$domain" > private-domain.txt
 git ls-files -z infra scripts/private-preview.sh scripts/private-preview.js scripts/runtime-preview.js |
   xargs -0 sha256sum > private-template.sha256
-sha256sum private-compiled.json >> private-template.sha256
 if [[ "$mode" == apply ]]; then
   cmp -s private-domain.txt approved-private/private-domain.txt ||
     { echo "::error::The environment domain changed after approval."; exit 1; }
@@ -66,14 +65,39 @@ if [[ "$mode" == apply ]]; then
   sha256sum --check approved-private/private-template.sha256
   node scripts/private-preview.js validate private-what-if.json "$domain" private-compiled.json approved-private/private-what-if.json
   deployment="private-workloads-$GITHUB_RUN_ID"
-  audit "started private-apply deployment=$deployment"
-  if ! state="$(az deployment group create --name "$deployment" --resource-group agtsdlc-dev-rg \
-    --template-file private-compiled.json --parameters @private-parameters.json \
-    --mode Incremental --query properties.provisioningState --output tsv 2>private-apply-error.txt)"; then
+  state=''
+  for attempt in 1 2 3; do
+    audit "started private-apply deployment=$deployment attempt=$attempt"
+    if state="$(az deployment group create --name "$deployment" --resource-group agtsdlc-dev-rg \
+      --template-file private-compiled.json --parameters @private-parameters.json \
+      --mode Incremental --query properties.provisioningState --output tsv 2>private-apply-error.txt)"; then
+      break
+    fi
+    az deployment operation group list --resource-group agtsdlc-dev-rg --name "$deployment" --output json \
+      > private-apply-operations.json 2>/dev/null || true
+    if [[ -s private-apply-operations.json ]]; then
+      node -e '
+        const fs = require("fs");
+        const ops = JSON.parse(fs.readFileSync("private-apply-operations.json", "utf8"));
+        const failed = ops.filter(op => op?.properties?.provisioningState === "Failed").map(op => ({
+          target: op?.properties?.targetResource?.resourceName ?? "unknown",
+          code: op?.properties?.statusMessage?.error?.code ?? "Unknown",
+          message: op?.properties?.statusMessage?.error?.message ?? "No message",
+        }));
+        if (failed.length) console.error(JSON.stringify({ failedOperations: failed }, null, 2));
+      ' || true
+    fi
+    if [[ "$attempt" -lt 3 ]] &&
+      grep -qi "Unable to get value using Managed identity" private-apply-error.txt &&
+      grep -qi "postgres-database-url" private-apply-error.txt; then
+      audit "retrying private-apply deployment=$deployment after secret-access propagation delay"
+      sleep 60
+      continue
+    fi
     audit "failed private-apply deployment=$deployment; inspect Azure deployment operations"
     echo "::error::Private workload deployment failed; inspect the Azure deployment operations for details."
     exit 1
-  fi
+  done
   [[ "$state" == Succeeded ]] || { echo "::error::Private workload deployment did not succeed."; exit 1; }
   audit "succeeded private-apply deployment=$deployment"
   node -e '

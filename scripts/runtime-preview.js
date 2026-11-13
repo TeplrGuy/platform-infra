@@ -34,11 +34,11 @@ function requireValue(actual, expected, message) {
 }
 
 function validate(preview, stage) {
-  if (!['secrets', 'core', 'recovery'].includes(stage)) throw new Error('Unknown runtime preview stage.');
+  if (!['secrets', 'secrets-check', 'core', 'recovery'].includes(stage)) throw new Error('Unknown runtime preview stage.');
   if (preview?.status !== 'Succeeded' || !Array.isArray(preview.changes)) {
     throw new Error('Runtime preview did not succeed or is incomplete.');
   }
-  const expected = new Map((stage === 'secrets' ? [
+  const expected = new Map((['secrets', 'secrets-check'].includes(stage) ? [
     [credential, 'Microsoft.KeyVault/vaults/secrets']
   ] : stage === 'recovery' ? [
     [`${pg}/configurations/azure.extensions`, 'Microsoft.DBforPostgreSQL/flexibleServers/configurations'],
@@ -135,7 +135,7 @@ if (require.main === module) {
       console.log(JSON.stringify(sanitize(JSON.parse(readFileSync(0, 'utf8')), process.env.POSTGRES_ADMIN_PASSWORD), null, 2));
     } else {
       const read = path => JSON.parse(readFileSync(path, 'utf8'));
-      if (!file || !['core', 'secrets', 'recovery'].includes(mode)) throw new Error('Usage: runtime-preview.js <core|secrets|recovery> <preview> [approved-preview], or sanitize on stdin.');
+      if (!file || !['core', 'secrets', 'secrets-check', 'recovery'].includes(mode)) throw new Error('Usage: runtime-preview.js <core|secrets|secrets-check|recovery> <preview> [approved-preview], or sanitize on stdin.');
       if (approved) validateAgainst(read(file), mode, read(approved));
       else validate(read(file), mode);
       console.log(`Runtime ${mode} preview matches the approved scope.`);

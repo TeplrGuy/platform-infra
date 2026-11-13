@@ -10,17 +10,32 @@ async function check(domain, request = fetch, sleep = ms => new Promise(resolve 
   if (!/^[a-z0-9-]+\.northeurope\.azurecontainerapps\.io$/.test(domain)) {
     throw Error('Unexpected Container Apps environment domain.');
   }
-  const targets = names.map(([service, app]) => [service, service, `https://${app}.internal.${domain}/health`]);
-  targets.push(['portal-to-gateway', 'api-gateway', `https://${names[0][1]}.internal.${domain}/api/health`]);
+  const targets = names.map(([service, app]) => ({
+    label: service,
+    expectedService: service,
+    url: `https://${app}.internal.${domain}/health`,
+    allowAuthChallenge: service === 'portal-web'
+  }));
+  targets.push({
+    label: 'portal-to-gateway',
+    expectedService: 'api-gateway',
+    url: `https://${names[0][1]}.internal.${domain}/api/health`,
+    allowAuthChallenge: true
+  });
   let success = true;
-  for (const [label, expected, url] of targets) {
+  for (const { label, expectedService, url, allowAuthChallenge } of targets) {
     let ok = false;
     let detail = 'no response';
     for (let attempt = 0; attempt < 4 && !ok; attempt++) {
       try {
         const response = await request(url, { signal: AbortSignal.timeout(20000) });
-        const body = await response.json();
-        ok = response.ok && body.status === 'ok' && body.service === expected;
+        if (response.ok) {
+          const body = await response.json();
+          ok = body.status === 'ok' && body.service === expectedService;
+        } else if (allowAuthChallenge && response.status === 401) {
+          const challenge = response.headers?.get?.('www-authenticate') || '';
+          ok = challenge.includes('login.microsoftonline.com/16b3c013-d300-468d-ac64-7eda0820b6d3/oauth2/v2.0/authorize');
+        }
         detail = `HTTP ${response.status}`;
       } catch (error) {
         detail = error.name;
