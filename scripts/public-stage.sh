@@ -142,8 +142,16 @@ const refs = Object.fromEntries(['PORTAL_REF', 'GATEWAY_REF', 'ORDERS_REF', 'INV
 validateLive(JSON.parse(fs.readFileSync('public-live-apps.json', 'utf8')),
   JSON.parse(process.argv[2]), process.argv[3], refs, process.argv[4], process.argv[5]);
 NODE
-redirect="$(curl --silent --show-error --max-time 30 --max-redirs 0 --dump-header - \
-  --output /dev/null --write-out $'\n%{http_code}' "$portal_url")"
+redirect=''
+for attempt in {1..20}; do
+  if redirect="$(curl --silent --show-error --max-time 30 --max-redirs 0 --dump-header - \
+    --output /dev/null --write-out $'\n%{http_code}' "$portal_url")"; then
+    break
+  fi
+  audit "retrying portal redirect probe attempt=$attempt"
+  sleep 15
+done
+[[ -n "$redirect" ]] || { echo "::error::Unable to reach the public portal URL for Entra redirect verification."; exit 1; }
 printf '%s' "$redirect" | node -e '
 const { validateLoginRedirect } = require("./scripts/public-preview");
 let response = "";
