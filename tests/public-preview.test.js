@@ -136,6 +136,8 @@ test('public apply rejects a changed preview and live resource/auth drift', () =
 test('anonymous portal smoke test requires the approved Entra authorization redirect', () => {
   const response = `HTTP/2 302 Found\r\nlocation: https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?client_id=${clientId}&response_type=code\r\n`;
   assert.doesNotThrow(() => validateLoginRedirect(response, clientId, tenantId));
+  const challenge = `HTTP/2 401 Unauthorized\r\nwww-authenticate: Bearer realm=\"example\" authorization_uri=\"https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize\" resource_id=\"${clientId}\"\r\n`;
+  assert.doesNotThrow(() => validateLoginRedirect(challenge, clientId, tenantId));
   assert.throws(() => validateLoginRedirect('HTTP/2 200 OK\r\n', clientId, tenantId));
   assert.throws(() => validateLoginRedirect(response.replace(tenantId, '00000000-0000-0000-0000-000000000000'), clientId, tenantId));
   assert.throws(() => validateLoginRedirect(response.replace(clientId, 'c0ffee00-0000-0000-0000-000000000000'), clientId, tenantId));

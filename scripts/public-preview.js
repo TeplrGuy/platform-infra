@@ -214,6 +214,12 @@ function validateLive(apps, auth, domain, refs, clientId, tenantId) {
 function validateLoginRedirect(response, clientId, tenantId) {
   const status = response.match(/(?:^|\r?\n)HTTP\/\S+\s+(\d{3})\s/m)?.[1];
   const location = response.match(/^location:\s*(\S+)/im)?.[1];
+  if (status === '401') {
+    const authenticate = response.match(/^www-authenticate:\s*(.+)$/im)?.[1] || '';
+    const expectedAuthorize = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`;
+    const resourceId = authenticate.match(/resource_id=\"([^\"]+)\"/i)?.[1];
+    if (authenticate.includes(expectedAuthorize) && resourceId?.toLowerCase() === clientId.toLowerCase()) return;
+  }
   let redirect;
   try {
     redirect = new URL(location);
