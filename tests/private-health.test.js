@@ -15,6 +15,13 @@ test('private health checks validate each service and the portal-to-gateway path
   const urls = [];
   const request = async url => {
     urls.push(url);
+    if (url.includes('-portal.')) {
+      return {
+        ok: false,
+        status: 401,
+        headers: { get: () => 'Bearer authorization_uri=\"https://login.microsoftonline.com/16b3c013-d300-468d-ac64-7eda0820b6d3/oauth2/v2.0/authorize\"' }
+      };
+    }
     return { ok: true, status: 200, json: async () => ({ status: 'ok', service: service(url) }) };
   };
   assert.equal(await check(domain, request, async () => {}), true);
