@@ -133,23 +133,29 @@ apply() {
 
 case "$mode" in
   secrets-preview)
-    export POSTGRES_ADMIN_PASSWORD="$RUNTIME_POSTGRES_PASSWORD"
-    preview secrets infra/runtime-secrets.bicepparam secrets-check
-    change_type="$(secrets_change_type)"
-    case "$change_type" in
-      Create)
-        require_new_database
-        echo "seed_required=true" >> "$GITHUB_OUTPUT"
-        ;;
-      Modify|NoChange)
-        echo "seed_required=false" >> "$GITHUB_OUTPUT"
-        audit "credential-reuse no credential change requested"
-        ;;
-      *)
-        echo "::error::Unexpected runtime secret change type: $change_type"
-        exit 1
-        ;;
-    esac
+    if [[ "$(credential_state)" == exists ]]; then
+      echo "seed_required=false" >> "$GITHUB_OUTPUT"
+      audit "credential-reuse no credential change requested"
+    else
+      require_new_database
+      export POSTGRES_ADMIN_PASSWORD="$RUNTIME_POSTGRES_PASSWORD"
+      preview secrets infra/runtime-secrets.bicepparam secrets-check
+      change_type="$(secrets_change_type)"
+      case "$change_type" in
+        Create)
+          require_new_database
+          echo "seed_required=true" >> "$GITHUB_OUTPUT"
+          ;;
+        Modify|NoChange)
+          echo "seed_required=false" >> "$GITHUB_OUTPUT"
+          audit "credential-reuse no credential change requested"
+          ;;
+        *)
+          echo "::error::Unexpected runtime secret change type: $change_type"
+          exit 1
+          ;;
+      esac
+    fi
     ;;
   secrets-apply)
     credential_status="$(credential_state)"
