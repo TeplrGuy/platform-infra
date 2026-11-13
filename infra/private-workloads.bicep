@@ -6,6 +6,7 @@ var names = loadJsonContent('main.parameters.json').parameters.resourceNames.val
 var foundation = loadJsonContent('foundation.parameters.json').parameters
 var appNames = foundation.appNames.value
 var identityIds = [for name in appNames: resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', '${name}-identity')]
+var runtimePostgresPassword = 'Aa0_PreviewOnly_NotAnActualCredential7c770123456789'
 
 resource environment 'Microsoft.App/managedEnvironments@2026-07-01' existing = {
   name: names.environment
@@ -21,6 +22,10 @@ resource registry 'Microsoft.ContainerRegistry/registries@2025-11-01' existing =
 
 resource vault 'Microsoft.KeyVault/vaults@2026-05-15' existing = {
   name: names.keyVault
+}
+
+resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2025-08-01' existing = {
+  name: names.postgres
 }
 
 module apps 'modules/container-apps.bicep' = {
@@ -42,6 +47,7 @@ module apps 'modules/container-apps.bicep' = {
     tags: foundation.tags.value
     entraClientId: ''
     entraTenantId: subscription().tenantId
+    databaseUrl: 'postgresql://agenticsadmin:${uriComponent(runtimePostgresPassword)}@${postgres.properties.fullyQualifiedDomainName}:5432/agenticsdldemo?sslmode=require'
   }
 }
 

@@ -7,8 +7,6 @@ const foundation = require('../infra/foundation.parameters.json').parameters;
 const root = '/subscriptions/b6f10878-9f8a-4b3f-8bc5-3464cdd79c77/resourceGroups/agtsdlc-dev-rg/providers/';
 const registry = 'cragentsdlcdev7c77.azurecr.io';
 const environmentId = `${root}Microsoft.App/managedEnvironments/cae-agentsdlc-dev-7c77`;
-const vaultSecret = 'https://kv-agentsdlc-dev-7c77.vault.azure.net/secrets/postgres-database-url';
-const vaultId = `${root}Microsoft.KeyVault/vaults/kv-agentsdlc-dev-7c77`;
 const registryId = `${root}Microsoft.ContainerRegistry/registries/cragentsdlcdev7c77`;
 
 function validateTemplate(template) {
@@ -27,7 +25,7 @@ function validateTemplate(template) {
       !isDeepStrictEqual(template.variables?.['$fxv#0']?.parameters?.resourceNames?.value, resourceNames) ||
       resourceNames.appInsights !== 'appi-agentsdlc-dev-7c77' ||
       nested.variables?.databaseUrlSecret !== 'postgres-database-url' ||
-      hash(apps.properties?.configuration?.secrets) !== '0d83a39080e111b8a1a26b4a0bdba68e913c875d6b02c8cea52d7bfb479e5490' ||
+      hash(apps.properties?.configuration?.secrets) !== '59ff5caad6c0b764fa8e40923863e229153d754c6cf356fec41e23b3459f0362' ||
       hash(apps.properties?.template?.containers?.[0]?.env) !== '1668e956400eaf480d7c736d54f138b04d59d5ee41e63a2e4d4cb0f31f741747') {
     throw Error('Compiled secret and environment bindings differ from the reviewed template.');
   }
@@ -121,10 +119,10 @@ function validate(preview, domain, refs, template) {
     }
     const secrets = config.secrets || [];
     if (db) {
-      const vaultReference = `[concat(reference('${vaultId}', '2026-05-15').vaultUri, 'secrets/', 'postgres-database-url')]`;
+      const secret = secrets[0] || {};
       if (!['postgres-database-url', '*******'].includes(vars.get('DATABASE_URL')?.secretRef) || secrets.length !== 1 ||
-          !['postgres-database-url', '*******'].includes(secrets[0].name) || ![vaultSecret, vaultReference].includes(secrets[0].keyVaultUrl) ||
-          secrets[0].identity?.toLowerCase() !== identity.toLowerCase()) throw Error('Database secret reference is invalid.');
+          !['postgres-database-url', '*******'].includes(secret.name) || secret.keyVaultUrl || secret.identity ||
+          !Object.prototype.hasOwnProperty.call(secret, 'value')) throw Error('Database secret reference is invalid.');
     } else if (secrets.length || vars.has('DATABASE_URL')) {
       throw Error('Unexpected database secret access.');
     }
